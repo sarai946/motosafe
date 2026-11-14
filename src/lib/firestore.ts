@@ -173,26 +173,26 @@ export async function eliminarContactoEmergencia(id: string) {
   await delay()
 }
 
-export async function obtenerAlertasActivas() {
+export async function obtenerAlertasActivas(): Promise<any[]> {
   await delay()
   return []
 }
 
-export async function crearAlertaVial(datos: any) {
+export async function crearAlertaVial(datos: any): Promise<string> {
   await delay()
   return `alerta-${Date.now()}`
 }
 
-export async function actualizarVotoAlerta(id: string, tipo: string) {
+export async function actualizarVotoAlerta(id: string, tipo: string): Promise<void> {
   await delay()
 }
 
-export async function obtenerClubes() {
+export async function obtenerClubes(): Promise<any[]> {
   await delay()
   return []
 }
 
-export async function obtenerEventos() {
+export async function obtenerEventos(): Promise<any[]> {
   await delay()
   return []
 }
