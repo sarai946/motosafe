@@ -135,3 +135,145 @@ export async function obtenerReportesEmergencia() {
   }
   return []
 }
+
+// ── Funciones adicionales demo ──────────────────────────────
+
+export async function obtenerMotocicleta(userId: string) {
+  await delay()
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(`motosafe_moto_${userId}`)
+    return saved ? JSON.parse(saved) : null
+  }
+  return null
+}
+
+export async function obtenerContactosEmergencia(userId: string) {
+  await delay()
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(`motosafe_contactos_${userId}`)
+    return saved ? JSON.parse(saved) : []
+  }
+  return []
+}
+
+export async function obtenerInfoMedica(userId: string) {
+  await delay()
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem(`motosafe_medica_${userId}`)
+    return saved ? JSON.parse(saved) : null
+  }
+  return null
+}
+
+export async function actualizarContactoEmergencia(id: string, datos: any) {
+  await delay()
+}
+
+export async function eliminarContactoEmergencia(id: string) {
+  await delay()
+}
+
+export async function obtenerAlertasActivas() {
+  await delay()
+  return []
+}
+
+export async function crearAlertaVial(datos: any) {
+  await delay()
+  return `alerta-${Date.now()}`
+}
+
+export async function actualizarVotoAlerta(id: string, tipo: string) {
+  await delay()
+}
+
+export async function obtenerClubes() {
+  await delay()
+  return []
+}
+
+export async function obtenerEventos() {
+  await delay()
+  return []
+}
+
+export async function crearClub(datos: any) {
+  await delay()
+  return `club-${Date.now()}`
+}
+
+export async function crearEvento(datos: any) {
+  await delay()
+  return `evento-${Date.now()}`
+}
+
+export async function unirseAClub(clubId: string, userId: string) {
+  await delay()
+}
+
+export async function salirDeClub(clubId: string, userId: string) {
+  await delay()
+}
+
+export async function guardarVencimientosDocumentos(userId: string, datos: any) {
+  await delay()
+}
+
+export async function agregarMantenimiento(userId: string, datos: any) {
+  await delay()
+  return `mant-${Date.now()}`
+}
+
+export async function eliminarMantenimiento(id: string) {
+  await delay()
+}
+
+export async function obtenerEstablecimientos() {
+  await delay()
+  return []
+}
+
+export async function obtenerTodosEstablecimientos() {
+  await delay()
+  return []
+}
+
+export async function crearEstablecimiento(datos: any) {
+  await delay()
+  return `est-${Date.now()}`
+}
+
+export async function actualizarEstablecimiento(id: string, datos: any) {
+  await delay()
+}
+
+export async function eliminarEstablecimiento(id: string) {
+  await delay()
+}
+
+export async function obtenerTodasAlertas() {
+  await delay()
+  return []
+}
+
+export async function verificarAlerta(id: string, verificado: boolean) {
+  await delay()
+}
+
+export async function obtenerTodosReportes() {
+  await delay()
+  return []
+}
+
+export async function actualizarEstadoReporte(id: string, estado: string) {
+  await delay()
+}
+
+export async function obtenerTodosUsuarios() {
+  await delay()
+  return []
+}
+
+export async function actualizarEstadoUsuario(id: string, activo: boolean) {
+  await delay()
+}

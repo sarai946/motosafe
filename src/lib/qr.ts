@@ -49,3 +49,20 @@ export async function desactivarQR(userId: string): Promise<void> {
 export async function reactivarQR(userId: string): Promise<void> {
   await inicializarQR(userId)
 }
+
+export async function descargarQRPDF(userId: string, nombre: string, placa?: string) {
+  const dataUrl = await generarQRBase64(userId)
+  const { jsPDF } = await import('jspdf')
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [85, 110] })
+  pdf.setFillColor(2, 14, 61)
+  pdf.rect(0, 0, 85, 110, 'F')
+  pdf.setTextColor(255, 255, 255)
+  pdf.setFontSize(14)
+  pdf.setFont('helvetica', 'bold')
+  pdf.text('MotoSafe', 42.5, 12, { align: 'center' })
+  pdf.addImage(dataUrl, 'PNG', 17.5, 22, 50, 50)
+  pdf.setFontSize(10)
+  pdf.text(nombre, 42.5, 80, { align: 'center' })
+  if (placa) { pdf.setFontSize(8); pdf.setTextColor(100, 200, 100); pdf.text(`Placa: ${placa}`, 42.5, 87, { align: 'center' }) }
+  pdf.save(`motosafe-qr-${nombre.replace(/\s/g, '-').toLowerCase()}.pdf`)
+}
