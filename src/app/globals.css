@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 2 14 61;
+    --foreground: 255 255 255;
+  }
+
+  * {
+    box-sizing: border-box;
+    padding: 0;
+    margin: 0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: #0d0d1a;
+    color: #ffffff;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  /* Botón primario */
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 active:bg-primary-700 text-white font-semibold
+           px-6 py-3 rounded-xl transition-all duration-200 shadow-glow-blue
+           focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-dark-900
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Botón de emergencia */
+  .btn-emergency {
+    @apply bg-emergency-red hover:bg-red-700 active:bg-red-800 text-white font-bold
+           px-6 py-4 rounded-2xl transition-all duration-200 shadow-glow-red
+           focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2 focus:ring-offset-dark-900
+           text-lg uppercase tracking-wide;
+  }
+
+  /* Botón secundario */
+  .btn-secondary {
+    @apply bg-transparent hover:bg-white/10 border border-white/30 hover:border-white/50
+           text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-white/30;
+  }
+
+  /* Botón verde (éxito/confirmación) */
+  .btn-success {
+    @apply bg-accent-500 hover:bg-accent-600 active:bg-accent-700 text-white font-semibold
+           px-6 py-3 rounded-xl transition-all duration-200 shadow-glow-green
+           focus:outline-none focus:ring-2 focus:ring-accent-400 focus:ring-offset-2;
+  }
+
+  /* Tarjeta base */
+  .card {
+    @apply bg-dark-800 border border-white/10 rounded-2xl p-6 shadow-card;
+  }
+
+  /* Tarjeta con hover */
+  .card-hover {
+    @apply card hover:border-primary-500/50 hover:shadow-glow-blue transition-all duration-300 cursor-pointer;
+  }
+
+  /* Input de formulario */
+  .input-field {
+    @apply w-full bg-dark-700 border border-white/20 rounded-xl px-4 py-3 text-white
+           placeholder-white/40 focus:outline-none focus:border-primary-400 focus:ring-1
+           focus:ring-primary-400 transition-colors duration-200;
+  }
+
+  /* Label */
+  .input-label {
+    @apply block text-sm font-medium text-white/80 mb-1.5;
+  }
+
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* Contenedor máximo */
+  .container-max {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Sección */
+  .section {
+    @apply py-16 md:py-24;
+  }
+
+  /* Título de sección */
+  .section-title {
+    @apply text-3xl md:text-4xl font-display font-bold text-white mb-4;
+  }
+
+  /* Subtítulo de sección */
+  .section-subtitle {
+    @apply text-lg text-white/60 max-w-2xl;
+  }
+}
+
+@layer utilities {
+  /* Gradiente de texto */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-300 to-accent-400 bg-clip-text text-transparent;
+  }
+
+  /* Texto brillante */
+  .text-glow {
+    text-shadow: 0 0 20px rgba(26, 86, 219, 0.6);
+  }
+
+  /* Fondo con blur */
+  .glass {
+    @apply bg-white/5 backdrop-blur-md border border-white/10;
+  }
+
+  /* Animación de parpadeo para emergencias */
+  .emergency-pulse {
+    animation: emergencyPulse 1.5s ease-in-out infinite;
+  }
+
+  /* Scroll suave en móvil */
+  .smooth-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Ocultar scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* Animación de emergencia */
+@keyframes emergencyPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(220, 38, 38, 0.8);
+    transform: scale(1.02);
+  }
+}
+
+/* Animación de carga */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #1a1a2e 25%, #2d2d44 50%, #1a1a2e 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* Scroll indicator */
+.scroll-indicator {
+  animation: scrollBounce 2s ease-in-out infinite;
+}
+
+@keyframes scrollBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(8px); }
+}
