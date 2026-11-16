@@ -9,9 +9,14 @@ export const COLECCIONES = {
   CONTACTOS_EMERGENCIA: 'contactos_emergencia',
   INFO_MEDICA: 'info_medica',
   REPORTES_EMERGENCIA: 'reportes_emergencia',
+  REPORTES: 'reportes',
+  ALERTAS: 'alertas',
   ALERTAS_VIALES: 'alertas_viales',
   ESTABLECIMIENTOS: 'establecimientos',
+  CLUBES: 'clubes',
+  EVENTOS: 'eventos',
   QR_CODES: 'qr_codes',
+  QR_TOKENS: 'qr_tokens',
 }
 
 const delay = (ms = 300) => new Promise(r => setTimeout(r, ms))
