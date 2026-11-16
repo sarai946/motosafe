@@ -129,7 +129,7 @@ export default function HeroSection() {
                 {/* QR real */}
                 <div className="bg-white rounded-2xl p-4 mb-4 flex flex-col items-center justify-center gap-2">
                   <QRCodeSVG
-                    value="http://192.168.1.67:3000/perfil/demo"
+                    value="http://192.168.101.27:3000/perfil/demo"
                     size={140}
                     bgColor="#ffffff"
                     fgColor="#020e3d"
