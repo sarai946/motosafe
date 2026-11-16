@@ -254,7 +254,7 @@ export async function verificarAlerta(id: string, verificado: boolean): Promise<
   await delay()
 }
 
-export async function obtenerTodosReportes(): Promise<any[]> {
+export async function obtenerTodosReportes(limite?: number): Promise<any[]> {
   await delay()
   return []
 }
