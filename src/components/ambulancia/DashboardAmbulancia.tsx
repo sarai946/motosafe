@@ -59,6 +59,7 @@ const SOLICITUDES_DEMO: SolicitudAmbulancia[] = [
 const CONDUCTOR_DEMO = {
   nombres: 'Pedro',
   apellidos: 'Gómez',
+  celular: '+573001112233',
   placaAmbulancia: 'AMB-789',
   empresa: 'Cruz Roja Bogotá',
   tipoAmbulancia: 'Medicalizada',
