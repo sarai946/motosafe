@@ -130,36 +130,19 @@ export default function RegistroStepper() {
 
       // 3. Guardar perfil
       await guardarPerfil(user.uid, {
-        id: user.uid,
-        userId: user.uid,
         nombres: datosPaso1.nombres,
         apellidos: datosPaso1.apellidos,
-        tipoDocumento: datosPaso1.tipoDocumento,
-        numeroDocumento: datosPaso1.numeroDocumento,
+        tipo_documento: datosPaso1.tipoDocumento,
+        numero_documento: datosPaso1.numeroDocumento,
         celular: datosPaso1.celular,
-        email: datosPaso1.email,
         ciudad: datosPaso1.ciudad,
         pais: 'Colombia',
-        qrCode: user.uid,
-        qrActivo: true,
-        isActive: true,
-        profilePublico: {
-          mostrarNombre: true,
-          mostrarCelular: false,
-          mostrarEmail: false,
-          mostrarCiudad: true,
-          mostrarPlacaMoto: true,
-          mostrarFotoMoto: true,
-          mostrarContactosEmergencia: true,
-          mostrarInfoMedica: infoMedica.mostrarEnEmergencia,
-        },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        qr_code: user.uid,
+        qr_activo: true,
       })
 
       // 4. Guardar motocicleta
       await guardarMotocicleta(user.uid, {
-        userId: user.uid,
         placa: datosPaso2.placa.toUpperCase(),
         marca: datosPaso2.marca,
         modelo: datosPaso2.modelo,
@@ -172,11 +155,11 @@ export default function RegistroStepper() {
       for (const contacto of contactos) {
         if (contacto.nombreCompleto && contacto.celular) {
           await guardarContactoEmergencia(user.uid, {
-            nombreCompleto: contacto.nombreCompleto,
+            nombre_completo: contacto.nombreCompleto,
             parentesco: contacto.parentesco,
             celular: contacto.celular,
-            autorizadoNotificaciones: contacto.autorizadoNotificaciones,
-            esContactoPrincipal: contactos.indexOf(contacto) === 0,
+            autorizado_notificaciones: contacto.autorizadoNotificaciones,
+            es_contacto_principal: contactos.indexOf(contacto) === 0,
           })
         }
       }
@@ -184,14 +167,12 @@ export default function RegistroStepper() {
       // 6. Guardar info médica (si se proporcionó)
       if (infoMedica.grupoSanguineo || infoMedica.alergias || infoMedica.observaciones) {
         await guardarInfoMedica(user.uid, {
-          userId: user.uid,
-          grupoSanguineo: infoMedica.grupoSanguineo || undefined,
-          alergias: infoMedica.alergias || undefined,
-          condicionesMedicas: infoMedica.condicionesMedicas || undefined,
-          medicamentos: infoMedica.medicamentos || undefined,
-          observaciones: infoMedica.observaciones || undefined,
-          mostrarEnEmergencia: infoMedica.mostrarEnEmergencia,
-          id: user.uid,
+          grupo_sanguineo: infoMedica.grupoSanguineo || null,
+          alergias: infoMedica.alergias || null,
+          condiciones_medicas: infoMedica.condicionesMedicas || null,
+          medicamentos: infoMedica.medicamentos || null,
+          observaciones: infoMedica.observaciones || null,
+          mostrar_en_emergencia: infoMedica.mostrarEnEmergencia,
         })
       }
 

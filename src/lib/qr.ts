@@ -2,7 +2,7 @@
 // MOTOSAFE - Generación de QR (DEMO sin Firebase)
 // ============================================================
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://motosafe-epce.vercel.app'
 
 /** Genera la URL pública del perfil del motociclista */
 export function generarUrlPerfil(userId: string): string {

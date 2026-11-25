@@ -37,7 +37,28 @@ export async function obtenerPerfil(userId: string): Promise<any> {
     .select('*')
     .eq('user_id', userId)
     .single()
-  return data
+  if (!data) return null
+  return {
+    ...data,
+    nombres: data.nombres,
+    apellidos: data.apellidos,
+    celular: data.celular,
+    ciudad: data.ciudad,
+    departamento: data.departamento,
+    qrActivo: data.qr_activo,
+    qrCode: data.qr_code,
+    fotoPerfil: data.foto_perfil,
+    profilePublico: {
+      mostrarNombre: data.mostrar_nombre ?? true,
+      mostrarCelular: data.mostrar_celular ?? false,
+      mostrarEmail: data.mostrar_email ?? false,
+      mostrarCiudad: data.mostrar_ciudad ?? true,
+      mostrarPlacaMoto: data.mostrar_placa_moto ?? true,
+      mostrarFotoMoto: data.mostrar_foto_moto ?? true,
+      mostrarContactosEmergencia: data.mostrar_contactos ?? true,
+      mostrarInfoMedica: data.mostrar_info_medica ?? true,
+    },
+  }
 }
 
 // ── Motocicleta ─────────────────────────────────────────────
@@ -91,7 +112,12 @@ export async function obtenerContactosEmergencia(userId: string): Promise<any[]>
     .select('*')
     .eq('user_id', userId)
     .order('created_at', { ascending: true })
-  return data || []
+  return (data || []).map((c: any) => ({
+    ...c,
+    nombreCompleto: c.nombre_completo,
+    autorizadoNotificaciones: c.autorizado_notificaciones,
+    esContactoPrincipal: c.es_contacto_principal,
+  }))
 }
 
 export async function actualizarContactoEmergencia(id: string, datos: any): Promise<void> {
@@ -121,7 +147,13 @@ export async function obtenerInfoMedica(userId: string): Promise<any> {
     .select('*')
     .eq('user_id', userId)
     .single()
-  return data
+  if (!data) return null
+  return {
+    ...data,
+    grupoSanguineo: data.grupo_sanguineo,
+    condicionesMedicas: data.condiciones_medicas,
+    mostrarEnEmergencia: data.mostrar_en_emergencia,
+  }
 }
 
 // ── Perfil público (escaneo QR) ─────────────────────────────
