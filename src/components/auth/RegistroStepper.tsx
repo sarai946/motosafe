@@ -196,7 +196,7 @@ export default function RegistroStepper() {
       }
 
       // 7. Registro completado
-      toast.success('¡Registro exitoso! Bienvenido a MotoSafe 🏍️')
+      toast.success('¡Perfil creado exitosamente! Bienvenido a MotoSafe 🏍️', { duration: 4000 })
       router.push('/dashboard')
     } catch (error: any) {
       console.error('Error en registro:', error)
