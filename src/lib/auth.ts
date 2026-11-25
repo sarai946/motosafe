@@ -24,7 +24,12 @@ export async function registrarUsuario(
       data: { nombre_completo: nombreCompleto },
     },
   })
-  if (error) throw error
+  if (error) {
+    console.error('Supabase signup error:', error.message, error.status)
+    const err: any = new Error(error.message)
+    err.code = error.status
+    throw err
+  }
   if (!data.user) throw new Error('No se pudo crear el usuario')
 
   // Crear registro en tabla usuarios

@@ -199,9 +199,8 @@ export default function RegistroStepper() {
       toast.success('¡Registro exitoso! Bienvenido a MotoSafe 🏍️')
       router.push('/dashboard')
     } catch (error: any) {
-      const msg = error.code === 'auth/email-already-in-use'
-        ? 'Ya existe una cuenta con ese correo'
-        : 'Error en el registro. Intenta de nuevo.'
+      console.error('Error en registro:', error)
+      const msg = error.message || 'Error en el registro. Intenta de nuevo.'
       toast.error(msg)
     } finally {
       setCargando(false)
