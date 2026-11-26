@@ -361,9 +361,10 @@ export async function crearAlertaVial(datos: any): Promise<string> {
 
 export async function actualizarVotoAlerta(id: string, tipo: string): Promise<void> {
   const campo = tipo === 'util' ? 'votos_util' : 'votos_no_util'
-  const { data: alerta } = await supabase.from('alertas_viales').select(campo).eq('id', id).single()
+  const { data: alerta } = await supabase.from('alertas_viales').select('votos_util, votos_no_util').eq('id', id).single()
   if (alerta) {
-    await supabase.from('alertas_viales').update({ [campo]: (alerta[campo] || 0) + 1 }).eq('id', id)
+    const valorActual = tipo === 'util' ? (alerta.votos_util || 0) : (alerta.votos_no_util || 0)
+    await supabase.from('alertas_viales').update({ [campo]: valorActual + 1 }).eq('id', id)
   }
 }
 
