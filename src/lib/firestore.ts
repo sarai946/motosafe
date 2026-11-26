@@ -392,8 +392,25 @@ export async function verificarAlerta(id: string, verificado: boolean): Promise<
 
 // ── Establecimientos ────────────────────────────────────────
 
-export async function obtenerEstablecimientos(): Promise<any[]> {
-  const { data } = await supabase.from('establecimientos').select('*').order('nombre', { ascending: true })
+export async function obtenerEstablecimientos(filtros?: {
+  tipo?: string
+  ciudad?: string
+  es24h?: boolean
+  servicioDomicilio?: boolean
+}): Promise<any[]> {
+  let query = supabase
+    .from('establecimientos')
+    .select('*')
+    .eq('verificado', true)
+    .eq('activo', true)
+    .order('nombre', { ascending: true })
+
+  if (filtros?.tipo) query = query.eq('tipo', filtros.tipo)
+  if (filtros?.ciudad) query = query.ilike('ciudad', `%${filtros.ciudad}%`)
+  if (filtros?.es24h) query = query.eq('es_24_horas', true)
+  if (filtros?.servicioDomicilio) query = query.eq('servicio_domicilio', true)
+
+  const { data } = await query
   return data || []
 }
 
@@ -459,4 +476,105 @@ export async function completarSolicitudAmbulancia(solicitudId: string): Promise
   await supabase.from('solicitudes_ambulancia').update({
     estado: 'COMPLETADA', completada_at: new Date(),
   }).eq('id', solicitudId)
+}
+
+// ── Solicitudes de registro de establecimientos ─────────────
+
+export async function enviarSolicitudEstablecimiento(datos: any): Promise<string> {
+  const { data, error } = await supabase
+    .from('solicitudes_establecimiento')
+    .insert(datos)
+    .select('id')
+    .single()
+  if (error) throw error
+  return data?.id
+}
+
+export async function obtenerSolicitudesEstablecimiento(): Promise<any[]> {
+  const { data } = await supabase
+    .from('solicitudes_establecimiento')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return data || []
+}
+
+export async function actualizarSolicitudEstablecimiento(id: string, datos: any): Promise<void> {
+  const { error } = await supabase
+    .from('solicitudes_establecimiento')
+    .update({ ...datos, updated_at: new Date() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function aprobarSolicitudComoEstablecimiento(solicitud: any): Promise<void> {
+  // 1. Crear el establecimiento
+  const { error } = await supabase.from('establecimientos').insert({
+    nombre: solicitud.nombre,
+    tipo: solicitud.tipo,
+    nit: solicitud.nit,
+    representante: solicitud.representante,
+    descripcion: solicitud.descripcion,
+    direccion: solicitud.direccion,
+    ciudad: solicitud.ciudad,
+    localidad: solicitud.localidad,
+    lat: solicitud.lat,
+    lng: solicitud.lng,
+    telefono: solicitud.telefono,
+    whatsapp: solicitud.whatsapp,
+    horarios: solicitud.horarios,
+    es_24_horas: solicitud.es_24_horas,
+    servicio_domicilio: solicitud.servicio_domicilio,
+    servicios: solicitud.servicios,
+    tarifas: solicitud.tarifas,
+    habilitacion_legal: solicitud.habilitacion_legal,
+    verificado: false, // el admin verifica manualmente después
+    activo: true,
+    estado: 'NO_CONFIRMADO',
+  })
+  if (error) throw error
+
+  // 2. Marcar solicitud como aprobada
+  await supabase
+    .from('solicitudes_establecimiento')
+    .update({ estado: 'APROBADA', updated_at: new Date() })
+    .eq('id', solicitud.id)
+}
+
+// ── Calificaciones de establecimientos ──────────────────────
+
+export async function calificarEstablecimiento(
+  establecimientoId: string,
+  authId: string,
+  calificacion: number,
+  comentario?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('calificaciones_establecimiento')
+    .upsert(
+      { establecimiento_id: establecimientoId, auth_id: authId, calificacion, comentario },
+      { onConflict: 'establecimiento_id,auth_id' }
+    )
+  if (error) throw error
+
+  // Actualizar promedio en la tabla establecimientos
+  const { data } = await supabase
+    .from('calificaciones_establecimiento')
+    .select('calificacion')
+    .eq('establecimiento_id', establecimientoId)
+
+  if (data && data.length > 0) {
+    const promedio = data.reduce((sum: number, r: any) => sum + r.calificacion, 0) / data.length
+    await supabase
+      .from('establecimientos')
+      .update({ calificacion: Math.round(promedio * 10) / 10 })
+      .eq('id', establecimientoId)
+  }
+}
+
+export async function obtenerTodosEstablecimientosAdmin(): Promise<any[]> {
+  const { data } = await supabase
+    .from('establecimientos')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return data || []
 }
