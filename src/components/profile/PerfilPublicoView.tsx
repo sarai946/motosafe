@@ -391,39 +391,39 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
           )}
         </div>
 
+        {/* ── Botón Solicitar Ambulancia — siempre visible ── */}
+        <button
+          onClick={() => {
+            const lat = ubicacion?.lat
+            const lng = ubicacion?.lng
+            const motociclista = `${perfil.nombres} ${perfil.apellidos}`
+            const placa = perfil.moto?.placa ?? ''
+            let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
+            msg += `👤 *Accidentado:* ${motociclista}\n`
+            if (placa) msg += `🏍️ *Placa:* ${placa}\n`
+            if (perfil.infoMedica?.grupoSanguineo) msg += `🩸 *Sangre:* ${perfil.infoMedica.grupoSanguineo}\n`
+            if (perfil.infoMedica?.eps) msg += `🏥 *EPS:* ${perfil.infoMedica.eps}\n`
+            if (perfil.infoMedica?.alergias) msg += `⚠️ *Alergias:* ${perfil.infoMedica.alergias}\n`
+            if (lat && lng) msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${lat},${lng}\n`
+            else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
+            msg += `\n_Enviado desde MotoSafe — ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
+            const encoded = encodeURIComponent(msg)
+            window.open(`https://wa.me/573123018786?text=${encoded}`, '_blank')
+            setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
+            toast.success('🚑 Solicitud enviada a la central de ambulancias')
+          }}
+          className="w-full py-5 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-xl rounded-2xl transition-all shadow-2xl flex items-center justify-center gap-3"
+          style={{ boxShadow: '0 0 30px rgba(220,38,38,0.5)' }}
+        >
+          🚑 SOLICITAR AMBULANCIA
+        </button>
+
         {/* ── Contactos de emergencia ── */}
         {perfil.contactosEmergencia.length > 0 && (
           <div className="card border border-white/10">
             <h2 className="text-white font-semibold mb-3 flex items-center gap-2">
               <Phone className="w-4 h-4 text-primary-400" /> Contactos de emergencia
             </h2>
-
-            {/* Botón solicitar ambulancia dentro de la sección */}
-            <button
-              onClick={() => {
-                const lat = ubicacion?.lat
-                const lng = ubicacion?.lng
-                const motociclista = `${perfil.nombres} ${perfil.apellidos}`
-                const placa = perfil.moto?.placa ?? ''
-                let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
-                msg += `👤 *Accidentado:* ${motociclista}\n`
-                if (placa) msg += `🏍️ *Placa:* ${placa}\n`
-                if (perfil.infoMedica?.grupoSanguineo) msg += `🩸 *Sangre:* ${perfil.infoMedica.grupoSanguineo}\n`
-                if (perfil.infoMedica?.eps) msg += `🏥 *EPS:* ${perfil.infoMedica.eps}\n`
-                if (perfil.infoMedica?.alergias) msg += `⚠️ *Alergias:* ${perfil.infoMedica.alergias}\n`
-                if (lat && lng) msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${lat},${lng}\n`
-                else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
-                msg += `\n_Enviado desde MotoSafe — ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
-                const encoded = encodeURIComponent(msg)
-                window.open(`https://wa.me/573123018786?text=${encoded}`, '_blank')
-                setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
-                toast.success('🚑 Solicitud enviada a la central de ambulancias')
-              }}
-              className="w-full mb-3 py-4 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-base rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2"
-              style={{ boxShadow: '0 0 20px rgba(220,38,38,0.4)' }}
-            >
-              🚑 SOLICITAR AMBULANCIA
-            </button>
 
             <div className="space-y-2">
               {perfil.contactosEmergencia.map((contacto) => (
