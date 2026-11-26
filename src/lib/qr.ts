@@ -5,17 +5,14 @@ import { supabase } from './supabase'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://motosafe-epce.vercel.app'
 
-/** Genera la URL pública del perfil del motociclista */
+/** Genera la URL pública del perfil — usa el auth_id del usuario */
 export function generarUrlPerfil(userId: string): string {
   return `${APP_URL}/perfil/${userId}`
 }
 
-/** Inicializa el QR de un usuario en Supabase */
+/** Inicializa el QR — busca el perfil por auth_id */
 export async function inicializarQR(userId: string): Promise<string> {
-  await supabase
-    .from('perfiles')
-    .update({ qr_code: userId, qr_activo: true })
-    .eq('user_id', userId)
+  // No necesita hacer nada extra — el perfil ya se guarda con qr_activo=true en guardarPerfil
   return generarUrlPerfil(userId)
 }
 
@@ -44,12 +41,19 @@ export async function descargarQRPNG(userId: string, nombreArchivo = 'motosafe-q
 
 /** Desactiva el QR en Supabase */
 export async function desactivarQR(userId: string): Promise<void> {
-  await supabase.from('perfiles').update({ qr_activo: false }).eq('user_id', userId)
+  // Buscar por auth_id
+  const { data: usuario } = await supabase.from('usuarios').select('id').eq('auth_id', userId).single()
+  if (usuario) {
+    await supabase.from('perfiles').update({ qr_activo: false }).eq('user_id', usuario.id)
+  }
 }
 
 /** Reactiva el QR en Supabase */
 export async function reactivarQR(userId: string): Promise<void> {
-  await supabase.from('perfiles').update({ qr_activo: true }).eq('user_id', userId)
+  const { data: usuario } = await supabase.from('usuarios').select('id').eq('auth_id', userId).single()
+  if (usuario) {
+    await supabase.from('perfiles').update({ qr_activo: true }).eq('user_id', usuario.id)
+  }
 }
 
 /** Descarga el QR como PDF/Carné */
