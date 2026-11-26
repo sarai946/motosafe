@@ -182,7 +182,7 @@ function PanelCentral({ email, onLogout }: { email: string; onLogout: () => void
           <div>
             <p className="text-green-300 text-sm font-semibold">Solicitudes por WhatsApp</p>
             <p className="text-white/50 text-xs">
-              Las solicitudes de emergencia llegan directamente a los números <strong className="text-white">3025341268</strong> y <strong className="text-white">3025341789</strong> con todos los datos del accidentado y la ubicación GPS.
+              Las solicitudes de emergencia llegan directamente a los números <strong className="text-white">3123018786</strong> y <strong className="text-white">3025341789</strong> con todos los datos del accidentado y la ubicación GPS.
             </p>
           </div>
         </div>
@@ -306,7 +306,7 @@ function PanelCentral({ email, onLogout }: { email: string; onLogout: () => void
               <div className="space-y-3">
                 {[
                   { label: 'Correo de acceso', value: email },
-                  { label: 'Solicitudes recibidas por', value: 'WhatsApp: 3025341268 · 3025341789' },
+                  { label: 'Solicitudes recibidas por', value: 'WhatsApp: 3123018786 · 3025341789' },
                   { label: 'Estado', value: 'Activa y verificada' },
                 ].map(item => (
                   <div key={item.label} className="flex justify-between py-2 border-b border-white/5 last:border-0">

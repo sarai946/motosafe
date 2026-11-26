@@ -114,11 +114,8 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
 
       const encoded = encodeURIComponent(msg)
       // Abrir WhatsApp al primer número de la central
-      window.open(`https://wa.me/573025341268?text=${encoded}`, '_blank')
-      // Después de 1 segundo abrir el segundo número
-      setTimeout(() => {
-        window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank')
-      }, 1000)
+      window.open(`https://wa.me/573123018786?text=${encoded}`, '_blank')
+      setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
 
       setConfirmacion('✓ Solicitud enviada a la central de ambulancias por WhatsApp')
       setLlamando(null)
@@ -418,7 +415,7 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
                 else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
                 msg += `\n_Enviado desde MotoSafe — ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
                 const encoded = encodeURIComponent(msg)
-                window.open(`https://wa.me/573025341268?text=${encoded}`, '_blank')
+                window.open(`https://wa.me/573123018786?text=${encoded}`, '_blank')
                 setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
                 toast.success('🚑 Solicitud enviada a la central de ambulancias')
               }}
