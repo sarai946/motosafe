@@ -1,11 +1,10 @@
 import type { Metadata } from 'next'
-import RegistroAmbulanciaForm from '@/components/ambulancia/RegistroAmbulanciaForm'
+import RegistroCentralForm from '@/components/ambulancia/RegistroCentralForm'
 
 export const metadata: Metadata = {
-  title: 'Registrar ambulancia — MotoSafe',
-  description: 'Registra tu ambulancia en MotoSafe y recibe solicitudes de emergencia cerca de ti.',
+  title: 'Registrar Central de Ambulancias — MotoSafe',
 }
 
-export default function RegistroAmbulanciaPage() {
-  return <RegistroAmbulanciaForm />
+export default function RegistroCentralPage() {
+  return <RegistroCentralForm />
 }
