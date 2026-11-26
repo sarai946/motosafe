@@ -76,6 +76,12 @@ export default function Navbar() {
         {/* ── CTAs escritorio ── */}
         <div className="hidden md:flex items-center gap-3">
           <Link
+            href="/ambulancia/dashboard"
+            className="text-sm py-2 px-4 text-red-300 hover:text-red-200 border border-red-500/30 hover:border-red-500/60 rounded-xl transition-colors flex items-center gap-1.5"
+          >
+            🚑 Centrales
+          </Link>
+          <Link
             href="/login"
             className="btn-secondary text-sm py-2 px-4"
           >
@@ -123,6 +129,15 @@ export default function Navbar() {
 
           {/* Divisor */}
           <div className="border-t border-white/10 my-3" />
+
+          {/* Acceso centrales de ambulancias */}
+          <Link
+            href="/ambulancia/dashboard"
+            onClick={cerrarMenu}
+            className="block text-center py-3 text-sm font-semibold text-red-300 border border-red-500/30 rounded-xl"
+          >
+            🚑 Acceso centrales de ambulancias
+          </Link>
 
           {/* CTAs móvil */}
           <Link
