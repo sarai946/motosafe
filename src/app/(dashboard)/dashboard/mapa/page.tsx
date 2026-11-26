@@ -1,31 +1,28 @@
 'use client'
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import {
-  Map, Navigation, Search, Phone, Star, ExternalLink,
-  Layers, Clock, CheckCircle, X, ChevronDown, ChevronUp,
-  MessageSquare, Plus, Filter
+  Navigation, Search, Phone, Star, CheckCircle, X,
+  Clock, MessageSquare, MapPin, Locate, AlertTriangle, Plus
 } from 'lucide-react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useAuth } from '@/context/AuthContext'
-import { obtenerEstablecimientos, obtenerPerfil, calificarEstablecimiento } from '@/lib/firestore'
+import { obtenerEstablecimientos, calificarEstablecimiento } from '@/lib/firestore'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-// ── Categorías ───────────────────────────────────────────────
+// ── Categorías (sin AMBULANCIA en el mapa de servicios) ──────
 const TIPOS = [
-  { valor: 'TODOS',             label: 'Todos',        emoji: '📍', color: 'bg-white/10' },
-  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽', color: 'bg-yellow-500/20' },
-  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧', color: 'bg-blue-500/20' },
-  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🛞', color: 'bg-green-500/20' },
-  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️', color: 'bg-purple-500/20' },
-  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛', color: 'bg-orange-500/20' },
-  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️', color: 'bg-cyan-500/20' },
-  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🆘', color: 'bg-red-500/20' },
-  { valor: 'AMBULANCIA',        label: 'Ambulancias',  emoji: '🚑', color: 'bg-red-700/20' },
+  { valor: 'TODOS',             label: 'Todos',        emoji: '📍' },
+  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽' },
+  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧' },
+  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🔄' },
+  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️' },
+  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛' },
+  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️' },
+  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🏥' },
 ]
 
-// ── Distancia GPS ────────────────────────────────────────────
 function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
   const dLat = (lat2 - lat1) * Math.PI / 180
@@ -36,10 +33,24 @@ function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: numbe
 }
 
 function tipoInfo(tipo: string) {
-  return TIPOS.find(t => t.valor === tipo) || TIPOS[0]
+  return TIPOS.find(t => t.valor === tipo) || { valor: tipo, label: tipo, emoji: '📍' }
 }
 
-// ── Componente: Ficha completa de establecimiento ────────────
+// ── Genera URL del mapa con marcadores de OsmAnd/OSM ─────────
+// Muestra el mapa centrado en la ubicación del usuario
+// Los establecimientos se pueden seleccionar individualmente para verlos en el mapa
+function getMapUrl(
+  centro: { lat: number; lng: number },
+  marcador?: { lat: number; lng: number } | null,
+  zoom = 15
+): string {
+  const lat = marcador?.lat ?? centro.lat
+  const lng = marcador?.lng ?? centro.lng
+  const delta = zoom === 15 ? 0.015 : 0.03
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${lng-delta},${lat-delta},${lng+delta},${lat+delta}&layer=mapnik&marker=${lat},${lng}`
+}
+
+// ── Ficha completa ────────────────────────────────────────────
 function FichaEstablecimiento({
   est, ubicacion, onCerrar, userId
 }: {
@@ -49,27 +60,22 @@ function FichaEstablecimiento({
   userId?: string
 }) {
   const [calificando, setCalificando] = useState(false)
-  const [miCalificacion, setMiCalificacion] = useState(0)
   const info = tipoInfo(est.tipo)
 
   const abrirRuta = () => {
-    const origen = ubicacion ? `${ubicacion.lat},${ubicacion.lng}` : ''
-    const url = origen
-      ? `https://www.google.com/maps/dir/${origen}/${est.lat},${est.lng}`
+    const url = ubicacion
+      ? `https://www.google.com/maps/dir/${ubicacion.lat},${ubicacion.lng}/${est.lat},${est.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${est.lat},${est.lng}`
     window.open(url, '_blank')
   }
 
   const enviarCalificacion = async (valor: number) => {
     if (!userId) { toast.error('Debes iniciar sesión para calificar'); return }
-    setMiCalificacion(valor)
     try {
       await calificarEstablecimiento(est.id, userId, valor)
       toast.success('Calificación guardada')
       setCalificando(false)
-    } catch {
-      toast.error('Error al calificar')
-    }
+    } catch { toast.error('Error al calificar') }
   }
 
   const distancia = ubicacion && est.lat && est.lng
@@ -77,17 +83,15 @@ function FichaEstablecimiento({
     : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm"
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4"
       onClick={onCerrar}>
-      <div className="w-full max-w-lg bg-dark-800 border border-white/10 rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto"
+      <div className="w-full max-w-lg bg-dark-800 border border-white/10 rounded-t-3xl sm:rounded-3xl max-h-[85vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex items-start justify-between p-5 pb-3">
           <div className="flex items-center gap-3">
-            <div className={cn('w-12 h-12 rounded-2xl flex items-center justify-center text-2xl', info.color)}>
-              {info.emoji}
-            </div>
+            <div className="w-12 h-12 bg-dark-700 rounded-2xl flex items-center justify-center text-2xl">{info.emoji}</div>
             <div>
               <h2 className="text-white font-bold text-lg leading-tight">{est.nombre}</h2>
               <p className="text-white/40 text-xs">{info.label} · {est.ciudad}{est.localidad ? ` · ${est.localidad}` : ''}</p>
@@ -99,22 +103,27 @@ function FichaEstablecimiento({
         </div>
 
         <div className="px-5 pb-6 space-y-4">
+          {/* Mini mapa */}
+          {est.lat && est.lng && (
+            <div className="rounded-2xl overflow-hidden border border-white/10" style={{ height: 180 }}>
+              <iframe
+                src={getMapUrl({ lat: est.lat, lng: est.lng }, { lat: est.lat, lng: est.lng }, 16)}
+                width="100%" height="100%" style={{ border: 0 }} loading="lazy" />
+            </div>
+          )}
+
           {/* Badges */}
           <div className="flex flex-wrap gap-2">
             {est.verificado && (
               <span className="flex items-center gap-1 text-xs bg-accent-500/20 text-accent-300 border border-accent-500/30 px-2 py-1 rounded-lg">
-                <CheckCircle className="w-3 h-3" /> Verificado por MotoSafe
+                <CheckCircle className="w-3 h-3" /> Verificado
               </span>
             )}
             {est.es_24_horas && (
-              <span className="text-xs bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-1 rounded-lg">
-                🕐 24 horas
-              </span>
+              <span className="text-xs bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-1 rounded-lg">🕐 24 horas</span>
             )}
             {est.servicio_domicilio && (
-              <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-lg">
-                🏠 Servicio a domicilio
-              </span>
+              <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-lg">🏠 A domicilio</span>
             )}
             {distancia !== null && (
               <span className="text-xs bg-primary-500/20 text-primary-300 border border-primary-500/30 px-2 py-1 rounded-lg">
@@ -123,12 +132,9 @@ function FichaEstablecimiento({
             )}
           </div>
 
-          {/* Descripción */}
-          {est.descripcion && (
-            <p className="text-white/60 text-sm leading-relaxed">{est.descripcion}</p>
-          )}
+          {est.descripcion && <p className="text-white/60 text-sm">{est.descripcion}</p>}
 
-          {/* Info grid */}
+          {/* Info */}
           <div className="grid grid-cols-2 gap-2">
             {est.direccion && (
               <div className="col-span-2 p-3 bg-dark-700 rounded-xl">
@@ -139,9 +145,7 @@ function FichaEstablecimiento({
             {est.horarios && (
               <div className="p-3 bg-dark-700 rounded-xl">
                 <p className="text-white/40 text-[10px] uppercase mb-0.5">Horario</p>
-                <p className="text-white text-sm flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-white/40" /> {est.horarios}
-                </p>
+                <p className="text-white text-sm">{est.horarios}</p>
               </div>
             )}
             {est.calificacion && (
@@ -161,14 +165,12 @@ function FichaEstablecimiento({
           </div>
 
           {/* Servicios */}
-          {est.servicios && est.servicios.length > 0 && (
+          {est.servicios?.length > 0 && (
             <div>
-              <p className="text-white/40 text-xs uppercase mb-2">Servicios disponibles</p>
+              <p className="text-white/40 text-xs uppercase mb-2">Servicios</p>
               <div className="flex flex-wrap gap-1.5">
                 {est.servicios.map((s: string) => (
-                  <span key={s} className="text-xs bg-dark-700 text-white/60 px-2 py-1 rounded-lg border border-white/5">
-                    {s}
-                  </span>
+                  <span key={s} className="text-xs bg-dark-700 text-white/60 px-2 py-1 rounded-lg border border-white/5">{s}</span>
                 ))}
               </div>
             </div>
@@ -179,17 +181,13 @@ function FichaEstablecimiento({
             <div>
               <button onClick={() => setCalificando(!calificando)}
                 className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1">
-                <Star className="w-3 h-3" />
-                {calificando ? 'Cancelar calificación' : 'Calificar este lugar'}
+                <Star className="w-3 h-3" /> {calificando ? 'Cancelar' : 'Calificar este lugar'}
               </button>
               {calificando && (
                 <div className="flex gap-2 mt-2">
                   {[1,2,3,4,5].map(n => (
                     <button key={n} onClick={() => enviarCalificacion(n)}
-                      className={cn('w-10 h-10 rounded-xl text-lg transition-all',
-                        miCalificacion >= n ? 'bg-yellow-500/30 text-yellow-300' : 'bg-dark-700 text-white/30 hover:text-yellow-300')}>
-                      ⭐
-                    </button>
+                      className="w-10 h-10 rounded-xl text-lg bg-dark-700 hover:bg-yellow-500/20 transition-colors">⭐</button>
                   ))}
                 </div>
               )}
@@ -197,7 +195,7 @@ function FichaEstablecimiento({
           )}
 
           {/* Acciones */}
-          <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-1">
             {est.telefono && (
               <a href={`tel:${est.telefono}`}
                 className="flex items-center justify-center gap-2 py-3 bg-dark-700 hover:bg-dark-600 border border-white/10 rounded-xl text-white text-sm font-medium transition-colors">
@@ -214,7 +212,7 @@ function FichaEstablecimiento({
             <button onClick={abrirRuta}
               className={cn(
                 'flex items-center justify-center gap-2 py-3 bg-primary-500/20 hover:bg-primary-500/30 border border-primary-500/30 rounded-xl text-primary-300 text-sm font-medium transition-colors',
-                (!est.telefono && !est.whatsapp) ? 'col-span-2' : ''
+                !est.telefono && !est.whatsapp ? 'col-span-2' : ''
               )}>
               <Navigation className="w-4 h-4" /> Cómo llegar
             </button>
@@ -228,303 +226,254 @@ function FichaEstablecimiento({
 // ── Página principal ─────────────────────────────────────────
 export default function MapaPage() {
   const { user } = useAuth()
-  const [establecimientos, setEstablecimientos] = useState<any[]>([])
-  const [cargando, setCargando]   = useState(true)
-  const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
-  const [ciudadPerfil, setCiudadPerfil] = useState('')
-  const [seleccionado, setSeleccionado] = useState<any>(null)
-  const [vista, setVista]         = useState<'lista' | 'mapa'>('lista')
+
+  // Ubicación
+  const [ubicacion, setUbicacion]           = useState<{ lat: number; lng: number } | null>(null)
+  const [gpsEstado, setGpsEstado]           = useState<'solicitando' | 'activo' | 'denegado' | 'manual'>('solicitando')
+  const [ciudadManual, setCiudadManual]     = useState('')
+
+  // Establecimientos
+  const [todos, setTodos]                   = useState<any[]>([])
+  const [cargando, setCargando]             = useState(true)
+  const [seleccionado, setSeleccionado]     = useState<any>(null)
 
   // Filtros
-  const [busqueda, setBusqueda]   = useState('')
-  const [filtroTipo, setFiltroTipo] = useState('TODOS')
-  const [filtro24h, setFiltro24h] = useState(false)
-  const [filtroDomicilio, setFiltroDomicilio] = useState(false)
-  const [filtroVerificados, setFiltroVerificados] = useState(false)
-  const [mostrarFiltros, setMostrarFiltros] = useState(false)
+  const [busqueda, setBusqueda]             = useState('')
+  const [filtroTipo, setFiltroTipo]         = useState('TODOS')
 
+  // ── 1. Solicitar GPS al entrar ─────────────────────────────
   useEffect(() => {
-    obtenerEstablecimientos().then(e => { setEstablecimientos(e); setCargando(false) })
+    if (!navigator.geolocation) {
+      setGpsEstado('denegado')
+      setUbicacion({ lat: 4.711, lng: -74.0721 }) // Bogotá por defecto
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setGpsEstado('activo')
+      },
+      () => {
+        setGpsEstado('denegado')
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }, [])
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => setUbicacion({ lat: 4.711, lng: -74.0721 })
-      )
+  // ── 2. Cargar establecimientos desde Supabase ──────────────
+  useEffect(() => {
+    obtenerEstablecimientos()
+      .then(data => { setTodos(data); setCargando(false) })
+      .catch(() => setCargando(false))
+  }, [])
+
+  // ── 3. Usar ciudad manual como centro si no hay GPS ────────
+  const usarCiudadManual = () => {
+    // Coordenadas de ciudades principales de Colombia
+    const coords: Record<string, { lat: number; lng: number }> = {
+      'bogota': { lat: 4.711, lng: -74.0721 },
+      'bogotá': { lat: 4.711, lng: -74.0721 },
+      'medellin': { lat: 6.2442, lng: -75.5812 },
+      'medellín': { lat: 6.2442, lng: -75.5812 },
+      'cali': { lat: 3.4516, lng: -76.5319 },
+      'barranquilla': { lat: 10.9685, lng: -74.7813 },
+      'cartagena': { lat: 10.3910, lng: -75.4794 },
+      'bucaramanga': { lat: 7.1193, lng: -73.1227 },
+      'villavicencio': { lat: 4.1420, lng: -73.6266 },
+      'soacha': { lat: 4.5793, lng: -74.2177 },
+    }
+    const key = ciudadManual.toLowerCase().trim()
+    const coord = coords[key]
+    if (coord) {
+      setUbicacion(coord)
+      setGpsEstado('manual')
     } else {
-      setUbicacion({ lat: 4.711, lng: -74.0721 })
+      toast.error('Ciudad no encontrada. Intenta con: Bogotá, Medellín, Cali, Barranquilla...')
     }
+  }
 
-    if (user) {
-      obtenerPerfil(user.uid).then(p => { if (p?.ciudad) setCiudadPerfil(p.ciudad) })
-    }
-  }, [user])
-
-  // Filtrar y ordenar
-  const filtrados = establecimientos
+  // ── 4. Filtrar establecimientos con coordenadas válidas ────
+  const filtrados = todos
+    .filter(e => e.lat != null && e.lng != null) // solo con coordenadas
+    .filter(e => filtroTipo === 'TODOS' || e.tipo === filtroTipo)
     .filter(e => {
-      if (filtroTipo !== 'TODOS' && e.tipo !== filtroTipo) return false
-      if (filtro24h && !e.es_24_horas) return false
-      if (filtroDomicilio && !e.servicio_domicilio) return false
-      if (filtroVerificados && !e.verificado) return false
-      if (busqueda) {
-        const q = busqueda.toLowerCase()
-        return (
-          e.nombre?.toLowerCase().includes(q) ||
-          e.ciudad?.toLowerCase().includes(q) ||
-          e.direccion?.toLowerCase().includes(q) ||
-          e.tipo?.toLowerCase().includes(q)
-        )
-      }
-      return true
+      if (!busqueda) return true
+      const q = busqueda.toLowerCase()
+      return e.nombre?.toLowerCase().includes(q) ||
+             e.ciudad?.toLowerCase().includes(q) ||
+             e.direccion?.toLowerCase().includes(q)
     })
     .map(e => ({
       ...e,
-      distancia: ubicacion && e.lat && e.lng
+      distancia: ubicacion
         ? calcularDistancia(ubicacion.lat, ubicacion.lng, e.lat, e.lng)
         : null,
     }))
-    .sort((a, b) => {
-      if (a.distancia === null) return 1
-      if (b.distancia === null) return -1
-      return a.distancia - b.distancia
-    })
+    .sort((a, b) => (a.distancia ?? 999) - (b.distancia ?? 999))
 
-  const getMapUrl = () => {
-    if (seleccionado?.lat && seleccionado?.lng) {
-      return `https://www.openstreetmap.org/export/embed.html?bbox=${seleccionado.lng-0.01},${seleccionado.lat-0.01},${seleccionado.lng+0.01},${seleccionado.lat+0.01}&layer=mapnik&marker=${seleccionado.lat},${seleccionado.lng}`
-    }
-    if (ubicacion) {
-      return `https://www.openstreetmap.org/export/embed.html?bbox=${ubicacion.lng-0.03},${ubicacion.lat-0.03},${ubicacion.lng+0.03},${ubicacion.lat+0.03}&layer=mapnik&marker=${ubicacion.lat},${ubicacion.lng}`
-    }
-    return `https://www.openstreetmap.org/export/embed.html?bbox=-74.12,4.55,-73.98,4.80&layer=mapnik`
-  }
-
-  const hayFiltrosActivos = filtro24h || filtroDomicilio || filtroVerificados || filtroTipo !== 'TODOS'
+  // ── URL del mapa principal ─────────────────────────────────
+  const mapUrl = ubicacion
+    ? getMapUrl(ubicacion, seleccionado?.lat ? seleccionado : null)
+    : null
 
   return (
     <DashboardLayout>
-      <div className="p-4 md:p-6 space-y-4 max-w-3xl">
+      <div className="flex flex-col h-[calc(100vh-0px)] max-h-screen overflow-hidden">
 
-        {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-white font-display font-bold text-2xl">Mapa motero</h1>
-            <p className="text-white/40 text-sm mt-0.5">
-              {ubicacion ? '📍 Ubicación activa' : '📍 Obteniendo ubicación...'}
-              {ciudadPerfil && ` · ${ciudadPerfil}`}
-              {establecimientos.length > 0 && ` · ${establecimientos.length} lugares`}
-            </p>
-          </div>
-          <div className="flex gap-2">
+        {/* ── Header ── */}
+        <div className="p-4 pb-2 space-y-3 flex-shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h1 className="text-white font-display font-bold text-xl">Mapa motero</h1>
+              <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1">
+                {gpsEstado === 'activo' && <><span className="w-1.5 h-1.5 bg-green-400 rounded-full inline-block" /> GPS activo</>}
+                {gpsEstado === 'solicitando' && '📍 Obteniendo ubicación...'}
+                {gpsEstado === 'denegado' && <><AlertTriangle className="w-3 h-3 text-yellow-400" /> GPS no disponible</>}
+                {gpsEstado === 'manual' && <><MapPin className="w-3 h-3 text-blue-400" /> Ubicación manual</>}
+                {filtrados.length > 0 && ` · ${filtrados.length} lugar${filtrados.length !== 1 ? 'es' : ''} encontrado${filtrados.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
             <Link href="/dashboard/mapa/registrar"
-              className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5">
+              className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 shrink-0">
               <Plus className="w-3 h-3" /> Registrar negocio
             </Link>
-            <div className="flex gap-1 bg-dark-700 p-1 rounded-xl">
-              <button onClick={() => setVista('lista')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1',
-                  vista === 'lista' ? 'bg-primary-500 text-white' : 'text-white/50 hover:text-white')}>
-                <Map className="w-3 h-3" /> Lista
-              </button>
-              <button onClick={() => setVista('mapa')}
-                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1',
-                  vista === 'mapa' ? 'bg-primary-500 text-white' : 'text-white/50 hover:text-white')}>
-                <Layers className="w-3 h-3" /> Mapa
-              </button>
-            </div>
           </div>
-        </div>
 
-        {/* Búsqueda */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
+          {/* Input ciudad manual si no hay GPS */}
+          {gpsEstado === 'denegado' && (
+            <div className="p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+              <p className="text-yellow-300 text-xs mb-2">
+                ⚠️ No se pudo obtener tu ubicación GPS. Escribe tu ciudad para buscar servicios cercanos.
+              </p>
+              <div className="flex gap-2">
+                <input value={ciudadManual} onChange={e => setCiudadManual(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && usarCiudadManual()}
+                  className="input-field text-sm py-2 flex-1" placeholder="Bogotá, Medellín, Cali..." />
+                <button onClick={usarCiudadManual}
+                  className="btn-primary py-2 px-4 text-sm flex items-center gap-1.5">
+                  <Locate className="w-3 h-3" /> Buscar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Búsqueda */}
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              className="input-field pl-10" placeholder="Buscar por nombre, ciudad, tipo..." />
+              className="input-field pl-10 py-2 text-sm" placeholder="Buscar taller, gasolinera..." />
           </div>
-          <button onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            className={cn('px-3 py-2 rounded-xl border text-sm font-medium transition-colors flex items-center gap-1.5',
-              hayFiltrosActivos
-                ? 'bg-primary-500/20 border-primary-500/40 text-primary-300'
-                : 'bg-dark-700 border-white/10 text-white/50 hover:text-white')}>
-            <Filter className="w-4 h-4" />
-            {hayFiltrosActivos ? 'Filtros activos' : 'Filtros'}
-          </button>
+
+          {/* Categorías */}
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+            {TIPOS.map(t => (
+              <button key={t.valor} onClick={() => setFiltroTipo(t.valor)}
+                className={cn(
+                  'flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shrink-0',
+                  filtroTipo === t.valor ? 'bg-primary-500 text-white' : 'bg-dark-700 text-white/50 hover:text-white'
+                )}>
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Panel de filtros */}
-        {mostrarFiltros && (
-          <div className="card border border-white/10 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-white font-semibold text-sm">Filtros</p>
-              <button onClick={() => { setFiltro24h(false); setFiltroDomicilio(false); setFiltroVerificados(false); setFiltroTipo('TODOS') }}
-                className="text-white/30 hover:text-white text-xs">Limpiar</button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: '🕐 24 horas', active: filtro24h, toggle: () => setFiltro24h(!filtro24h) },
-                { label: '🏠 A domicilio', active: filtroDomicilio, toggle: () => setFiltroDomicilio(!filtroDomicilio) },
-                { label: '✓ Verificados', active: filtroVerificados, toggle: () => setFiltroVerificados(!filtroVerificados) },
-              ].map(f => (
-                <button key={f.label} onClick={f.toggle}
-                  className={cn('px-3 py-1.5 rounded-xl border text-sm transition-colors',
-                    f.active ? 'bg-primary-500/20 border-primary-500/40 text-primary-300' : 'bg-dark-700 border-white/10 text-white/50')}>
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* ── Layout mapa + lista ── */}
+        <div className="flex flex-1 overflow-hidden gap-0 md:gap-3 md:px-4 md:pb-4">
 
-        {/* Categorías */}
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-          {TIPOS.map(tipo => (
-            <button key={tipo.valor} onClick={() => setFiltroTipo(tipo.valor)}
-              className={cn('px-3 py-1.5 rounded-xl text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1 shrink-0',
-                filtroTipo === tipo.valor ? 'bg-primary-500 text-white' : 'bg-dark-700 text-white/50 hover:text-white')}>
-              {tipo.emoji} {tipo.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Vista mapa */}
-        {vista === 'mapa' && (
-          <div className="space-y-3">
-            <div className="rounded-2xl overflow-hidden border border-white/10" style={{ height: '380px' }}>
-              {ubicacion
-                ? <iframe src={getMapUrl()} title="Mapa" width="100%" height="100%" style={{ border: 0 }} loading="lazy" allowFullScreen />
-                : <div className="h-full flex items-center justify-center bg-dark-700">
-                    <Map className="w-10 h-10 text-primary-400 animate-pulse" />
-                  </div>
-              }
-            </div>
-            {/* Chips de establecimientos sobre el mapa */}
-            {filtrados.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {filtrados.slice(0, 10).map(est => (
-                  <button key={est.id}
-                    onClick={() => setSeleccionado(seleccionado?.id === est.id ? null : est)}
-                    className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs whitespace-nowrap transition-colors shrink-0',
-                      seleccionado?.id === est.id
-                        ? 'bg-primary-500 text-white border-primary-400'
-                        : 'bg-dark-700 text-white/60 border-white/10 hover:border-primary-500/40')}>
-                    <span>{tipoInfo(est.tipo).emoji}</span>
-                    {est.nombre}
-                    {est.distancia && <span className="text-white/40">{est.distancia.toFixed(1)}km</span>}
-                  </button>
-                ))}
+          {/* Mapa */}
+          <div className="hidden md:flex flex-1 rounded-2xl overflow-hidden border border-white/10 bg-dark-700 relative">
+            {mapUrl ? (
+              <iframe key={mapUrl} src={mapUrl} width="100%" height="100%"
+                style={{ border: 0 }} loading="lazy" title="Mapa motero" />
+            ) : (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-12 h-12 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-white/40 text-sm">Obteniendo ubicación...</p>
+                </div>
               </div>
             )}
-            <a href={ubicacion
-              ? `https://www.openstreetmap.org/?mlat=${ubicacion.lat}&mlon=${ubicacion.lng}#map=15/${ubicacion.lat}/${ubicacion.lng}`
-              : 'https://www.openstreetmap.org'}
-              target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-white/30 hover:text-white/60 text-xs">
-              <ExternalLink className="w-3 h-3" /> Abrir en OpenStreetMap
-            </a>
           </div>
-        )}
 
-        {/* Vista lista */}
-        {vista === 'lista' && (
-          cargando ? (
-            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="skeleton h-28 rounded-2xl" />)}</div>
-          ) : filtrados.length === 0 ? (
-            <div className="text-center py-12">
-              <Map className="w-10 h-10 text-white/20 mx-auto mb-3" />
-              <p className="text-white/40 font-medium">
-                {establecimientos.length === 0
-                  ? 'Aún no hay establecimientos registrados'
-                  : 'Sin resultados para este filtro'}
-              </p>
-              <p className="text-white/20 text-sm mt-1">
-                {establecimientos.length === 0
-                  ? 'Puedes registrar tu negocio o esperar que el administrador agregue lugares'
-                  : 'Intenta con otra categoría o quita los filtros'}
-              </p>
-              <Link href="/dashboard/mapa/registrar" className="btn-primary text-sm py-2.5 px-5 inline-flex items-center gap-2 mt-4">
-                <Plus className="w-4 h-4" /> Registrar mi negocio
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filtrados.map(est => {
-                const info = tipoInfo(est.tipo)
-                return (
-                  <div key={est.id}
-                    className="card border border-white/10 hover:border-primary-500/30 transition-colors cursor-pointer active:scale-[0.99]"
-                    onClick={() => setSeleccionado(est)}>
-                    <div className="flex items-start gap-3">
-                      <div className={cn('text-2xl shrink-0 w-11 h-11 rounded-xl flex items-center justify-center', info.color)}>
-                        {info.emoji}
+          {/* Lista lateral */}
+          <div className="w-full md:w-80 flex-shrink-0 overflow-y-auto px-4 md:px-0 pb-4 md:pb-0 space-y-2">
+            {/* Mapa móvil */}
+            {mapUrl && (
+              <div className="md:hidden rounded-2xl overflow-hidden border border-white/10" style={{ height: 220 }}>
+                <iframe key={mapUrl} src={mapUrl} width="100%" height="100%"
+                  style={{ border: 0 }} loading="lazy" title="Mapa" />
+              </div>
+            )}
+
+            {cargando ? (
+              [1,2,3].map(i => <div key={i} className="skeleton h-20 rounded-2xl" />)
+            ) : filtrados.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-3xl mb-2">🗺️</p>
+                <p className="text-white/40 font-medium text-sm">
+                  {todos.filter(e => e.lat && e.lng).length === 0
+                    ? 'Sin establecimientos con coordenadas aún'
+                    : 'Sin resultados para este filtro'}
+                </p>
+                <p className="text-white/20 text-xs mt-1">
+                  {todos.filter(e => e.lat && e.lng).length === 0
+                    ? 'El administrador debe verificar y activar los establecimientos'
+                    : 'Prueba con otra categoría'}
+                </p>
+              </div>
+            ) : (
+              filtrados.map(est => (
+                <button key={est.id}
+                  onClick={() => setSeleccionado(seleccionado?.id === est.id ? null : est)}
+                  className={cn(
+                    'w-full text-left p-3 rounded-2xl border transition-all',
+                    seleccionado?.id === est.id
+                      ? 'border-primary-500/60 bg-primary-500/10'
+                      : 'border-white/10 bg-dark-800 hover:border-white/30'
+                  )}>
+                  <div className="flex items-center gap-3">
+                    <div className="text-xl shrink-0">{tipoInfo(est.tipo).emoji}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-white font-semibold text-sm truncate">{est.nombre}</p>
+                        {est.verificado && <CheckCircle className="w-3 h-3 text-accent-400 shrink-0" />}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-white font-semibold text-sm">{est.nombre}</h3>
-                          {est.verificado && (
-                            <span className="flex items-center gap-0.5 text-[10px] bg-accent-500/20 text-accent-300 border border-accent-500/20 px-1.5 py-0.5 rounded-md shrink-0">
-                              <CheckCircle className="w-2.5 h-2.5" /> Verificado
-                            </span>
-                          )}
-                          {est.es_24_horas && (
-                            <span className="text-[10px] bg-green-500/20 text-green-300 border border-green-500/20 px-1.5 py-0.5 rounded-md shrink-0">24h</span>
-                          )}
-                        </div>
-                        <p className="text-white/40 text-xs mt-0.5">{info.label} · {est.ciudad}{est.localidad ? ` · ${est.localidad}` : ''}</p>
-                        {est.direccion && <p className="text-white/50 text-xs mt-0.5 truncate">{est.direccion}</p>}
-                        <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          {est.distancia !== null && (
-                            <span className="text-primary-400 text-xs font-semibold">📍 {est.distancia.toFixed(1)} km</span>
-                          )}
-                          {est.horarios && (
-                            <span className="text-white/30 text-xs flex items-center gap-0.5">
-                              <Clock className="w-3 h-3" /> {est.horarios}
-                            </span>
-                          )}
-                          {est.calificacion && (
-                            <span className="text-yellow-400 text-xs flex items-center gap-0.5">
-                              <Star className="w-3 h-3 fill-yellow-400" /> {est.calificacion}
-                            </span>
-                          )}
-                        </div>
+                      <p className="text-white/40 text-xs truncate">{est.ciudad}{est.localidad ? ` · ${est.localidad}` : ''}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {est.distancia !== null && (
+                          <span className="text-primary-400 text-xs font-semibold">
+                            {est.distancia.toFixed(1)} km
+                          </span>
+                        )}
+                        {est.horarios && (
+                          <span className="text-white/30 text-xs flex items-center gap-0.5">
+                            <Clock className="w-2.5 h-2.5" /> {est.horarios}
+                          </span>
+                        )}
+                        {est.es_24_horas && <span className="text-green-400 text-xs">24h</span>}
                       </div>
-                    </div>
-                    <div className="flex gap-3 mt-3 pt-3 border-t border-white/5" onClick={e => e.stopPropagation()}>
-                      {est.telefono && (
-                        <a href={`tel:${est.telefono}`} className="flex items-center gap-1.5 text-white/50 hover:text-white text-xs transition-colors">
-                          <Phone className="w-3 h-3" /> Llamar
-                        </a>
-                      )}
-                      {est.whatsapp && (
-                        <a href={`https://wa.me/57${est.whatsapp.replace(/\D/g,'')}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-green-400/70 hover:text-green-400 text-xs transition-colors">
-                          💬 WhatsApp
-                        </a>
-                      )}
-                      <button onClick={() => setSeleccionado(est)}
-                        className="flex items-center gap-1.5 text-primary-400 hover:text-primary-300 text-xs ml-auto transition-colors">
-                        Ver ficha completa →
-                      </button>
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )
-        )}
+                </button>
+              ))
+            )}
 
-        {/* CTA registro */}
-        <div className="p-4 bg-dark-700 border border-white/5 rounded-2xl text-center">
-          <p className="text-white/40 text-sm mb-2">¿Tienes un negocio para motociclistas?</p>
-          <Link href="/dashboard/mapa/registrar" className="btn-primary text-sm py-2.5 px-6 inline-flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Registrar mi establecimiento
-          </Link>
+            {/* CTA */}
+            {!cargando && (
+              <div className="p-3 bg-dark-700 border border-white/5 rounded-2xl text-center mt-2">
+                <p className="text-white/30 text-xs mb-1.5">¿Tienes un negocio para motociclistas?</p>
+                <Link href="/dashboard/mapa/registrar"
+                  className="text-primary-400 hover:text-primary-300 text-xs font-medium">
+                  Registrar mi establecimiento →
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Modal ficha completa */}
+      {/* Ficha modal */}
       {seleccionado && (
         <FichaEstablecimiento
           est={seleccionado}
