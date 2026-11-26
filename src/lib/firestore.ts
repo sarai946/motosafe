@@ -25,9 +25,36 @@ export const COLECCIONES = {
 // ── Perfil ──────────────────────────────────────────────────
 
 export async function guardarPerfil(userId: string, datos: any): Promise<void> {
+  // Mapear camelCase a snake_case para Supabase
+  const mapped: any = { updated_at: new Date() }
+  if (datos.nombres !== undefined) mapped.nombres = datos.nombres
+  if (datos.apellidos !== undefined) mapped.apellidos = datos.apellidos
+  if (datos.celular !== undefined) mapped.celular = datos.celular
+  if (datos.ciudad !== undefined) mapped.ciudad = datos.ciudad
+  if (datos.departamento !== undefined) mapped.departamento = datos.departamento
+  if (datos.fotoPerfil !== undefined) mapped.foto_perfil = datos.fotoPerfil
+  if (datos.qrActivo !== undefined) mapped.qr_activo = datos.qrActivo
+  if (datos.qrCode !== undefined) mapped.qr_code = datos.qrCode
+  // snake_case directo
+  if (datos.qr_activo !== undefined) mapped.qr_activo = datos.qr_activo
+  if (datos.qr_code !== undefined) mapped.qr_code = datos.qr_code
+  if (datos.tipo_documento !== undefined) mapped.tipo_documento = datos.tipo_documento
+  if (datos.numero_documento !== undefined) mapped.numero_documento = datos.numero_documento
+  if (datos.pais !== undefined) mapped.pais = datos.pais
+  // Privacidad
+  if (datos.profilePublico) {
+    const p = datos.profilePublico
+    mapped.mostrar_nombre = p.mostrarNombre ?? true
+    mapped.mostrar_celular = p.mostrarCelular ?? false
+    mapped.mostrar_ciudad = p.mostrarCiudad ?? true
+    mapped.mostrar_placa_moto = p.mostrarPlacaMoto ?? true
+    mapped.mostrar_contactos = p.mostrarContactosEmergencia ?? true
+    mapped.mostrar_info_medica = p.mostrarInfoMedica ?? true
+  }
+
   const { error } = await supabase
     .from('perfiles')
-    .upsert({ user_id: userId, ...datos, updated_at: new Date() }, { onConflict: 'user_id' })
+    .upsert({ user_id: userId, ...mapped }, { onConflict: 'user_id' })
   if (error) throw error
 }
 
@@ -64,9 +91,20 @@ export async function obtenerPerfil(userId: string): Promise<any> {
 // ── Motocicleta ─────────────────────────────────────────────
 
 export async function guardarMotocicleta(userId: string, datos: any): Promise<void> {
+  const mapped: any = { updated_at: new Date() }
+  if (datos.placa !== undefined) mapped.placa = datos.placa
+  if (datos.marca !== undefined) mapped.marca = datos.marca
+  if (datos.modelo !== undefined) mapped.modelo = datos.modelo
+  if (datos.cilindraje !== undefined) mapped.cilindraje = datos.cilindraje
+  if (datos.color !== undefined) mapped.color = datos.color
+  if (datos.anio !== undefined) mapped.anio = datos.anio
+  if (datos.tipoMoto !== undefined) mapped.tipo_moto = datos.tipoMoto
+  if (datos.tipo_moto !== undefined) mapped.tipo_moto = datos.tipo_moto
+  if (datos.fotoMoto !== undefined) mapped.foto_moto = datos.fotoMoto
+
   const { error } = await supabase
     .from('motocicletas')
-    .upsert({ user_id: userId, ...datos, updated_at: new Date() }, { onConflict: 'user_id' })
+    .upsert({ user_id: userId, ...mapped }, { onConflict: 'user_id' })
   if (error) throw error
 }
 
@@ -76,11 +114,23 @@ export async function obtenerMotocicleta(userId: string): Promise<any> {
     .select('*')
     .eq('user_id', userId)
     .single()
-  return data
+  if (!data) return null
+  return {
+    ...data,
+    soatVencimiento: data.soat_vencimiento,
+    tecnomecanicaVencimiento: data.tecnomecanica_vencimiento,
+    licenciaVencimiento: data.licencia_vencimiento,
+    fotoMoto: data.foto_moto,
+    historialMantenimiento: [],
+  }
 }
 
 export async function guardarVencimientosDocumentos(userId: string, datos: any): Promise<void> {
-  await guardarMotocicleta(userId, datos)
+  const mapped: any = {}
+  if (datos.soatVencimiento !== undefined) mapped.soat_vencimiento = datos.soatVencimiento || null
+  if (datos.tecnomecanicaVencimiento !== undefined) mapped.tecnomecanica_vencimiento = datos.tecnomecanicaVencimiento || null
+  if (datos.licenciaVencimiento !== undefined) mapped.licencia_vencimiento = datos.licenciaVencimiento || null
+  await supabase.from('motocicletas').update(mapped).eq('user_id', userId)
 }
 
 export async function agregarMantenimiento(userId: string, datos: any): Promise<string> {
@@ -135,9 +185,21 @@ export async function eliminarContactoEmergencia(id: string): Promise<void> {
 // ── Info médica ─────────────────────────────────────────────
 
 export async function guardarInfoMedica(userId: string, datos: any): Promise<void> {
+  const mapped: any = { updated_at: new Date() }
+  if (datos.grupoSanguineo !== undefined) mapped.grupo_sanguineo = datos.grupoSanguineo || null
+  if (datos.grupo_sanguineo !== undefined) mapped.grupo_sanguineo = datos.grupo_sanguineo
+  if (datos.eps !== undefined) mapped.eps = datos.eps
+  if (datos.alergias !== undefined) mapped.alergias = datos.alergias
+  if (datos.condicionesMedicas !== undefined) mapped.condiciones_medicas = datos.condicionesMedicas || null
+  if (datos.condiciones_medicas !== undefined) mapped.condiciones_medicas = datos.condiciones_medicas
+  if (datos.medicamentos !== undefined) mapped.medicamentos = datos.medicamentos
+  if (datos.observaciones !== undefined) mapped.observaciones = datos.observaciones
+  if (datos.mostrarEnEmergencia !== undefined) mapped.mostrar_en_emergencia = datos.mostrarEnEmergencia
+  if (datos.mostrar_en_emergencia !== undefined) mapped.mostrar_en_emergencia = datos.mostrar_en_emergencia
+
   const { error } = await supabase
     .from('info_medica')
-    .upsert({ user_id: userId, ...datos, updated_at: new Date() }, { onConflict: 'user_id' })
+    .upsert({ user_id: userId, ...mapped }, { onConflict: 'user_id' })
   if (error) throw error
 }
 
