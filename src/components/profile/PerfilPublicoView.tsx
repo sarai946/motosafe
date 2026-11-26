@@ -91,11 +91,37 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
       )
     }
 
-    // Ambulancia va al flujo especial
+    // Ambulancia — enviar WhatsApp a la central
     if (icono.id === 'ambulancia') {
-      const solicitudId = `sol-${Date.now()}`
-      setConfirmacion('Redirigiendo al sistema de ambulancias...')
-      setTimeout(() => { window.location.href = `/ambulancia/solicitud/${solicitudId}` }, 1000)
+      const lat = loc?.lat
+      const lng = loc?.lng
+      const motociclista = `${perfil.nombres} ${perfil.apellidos}`
+      const placa = perfil.moto?.placa ?? ''
+
+      let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
+      msg += `👤 *Accidentado:* ${motociclista}\n`
+      if (placa) msg += `🏍️ *Placa:* ${placa}\n`
+      if (perfil.infoMedica?.grupoSanguineo) msg += `🩸 *Sangre:* ${perfil.infoMedica.grupoSanguineo}\n`
+      if (perfil.infoMedica?.eps) msg += `🏥 *EPS:* ${perfil.infoMedica.eps}\n`
+      if (perfil.infoMedica?.alergias) msg += `⚠️ *Alergias:* ${perfil.infoMedica.alergias}\n`
+      if (perfil.infoMedica?.condicionesMedicas) msg += `📋 *Condiciones:* ${perfil.infoMedica.condicionesMedicas}\n`
+      if (lat && lng) {
+        msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${lat},${lng}\n`
+      } else if (ubicacionManual) {
+        msg += `📍 *Lugar:* ${ubicacionManual}\n`
+      }
+      msg += `\n_Enviado desde MotoSafe — ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
+
+      const encoded = encodeURIComponent(msg)
+      // Abrir WhatsApp al primer número de la central
+      window.open(`https://wa.me/573025341268?text=${encoded}`, '_blank')
+      // Después de 1 segundo abrir el segundo número
+      setTimeout(() => {
+        window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank')
+      }, 1000)
+
+      setConfirmacion('✓ Solicitud enviada a la central de ambulancias por WhatsApp')
+      setLlamando(null)
       return
     }
 
