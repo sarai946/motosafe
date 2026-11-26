@@ -32,8 +32,8 @@ export async function registrarUsuario(
   }
   if (!data.user) throw new Error('No se pudo crear el usuario')
 
-  // Crear registro en tabla usuarios usando auth_id
-  const { error: insertError } = await supabase.from('usuarios').insert({
+  // Crear registro en tabla usuarios
+  await supabase.from('usuarios').insert({
     auth_id: data.user.id,
     email: data.user.email,
     nombre_completo: nombreCompleto,
@@ -41,12 +41,8 @@ export async function registrarUsuario(
     is_active: true,
   })
 
-  if (insertError) {
-    console.error('Error insertando usuario:', insertError)
-  }
-
   return {
-    uid: data.user.id, // uid = auth_id de Supabase
+    uid: data.user.id,
     email: data.user.email!,
     displayName: nombreCompleto,
     role: 'user',

@@ -173,9 +173,17 @@ export async function eliminarMantenimiento(userId: string, id: string): Promise
 export async function guardarContactoEmergencia(userId: string, datos: any): Promise<void> {
   const internalId = await getInternalId(userId)
   if (!internalId) throw new Error('Usuario no encontrado')
-  const { error } = await supabase
-    .from('contactos_emergencia')
-    .insert({ user_id: internalId, ...datos })
+  const mapped: any = {}
+  if (datos.nombreCompleto !== undefined) mapped.nombre_completo = datos.nombreCompleto
+  if (datos.nombre_completo !== undefined) mapped.nombre_completo = datos.nombre_completo
+  if (datos.parentesco !== undefined) mapped.parentesco = datos.parentesco
+  if (datos.celular !== undefined) mapped.celular = datos.celular
+  if (datos.email !== undefined) mapped.email = datos.email
+  if (datos.autorizadoNotificaciones !== undefined) mapped.autorizado_notificaciones = datos.autorizadoNotificaciones
+  if (datos.autorizado_notificaciones !== undefined) mapped.autorizado_notificaciones = datos.autorizado_notificaciones
+  if (datos.esContactoPrincipal !== undefined) mapped.es_contacto_principal = datos.esContactoPrincipal
+  if (datos.es_contacto_principal !== undefined) mapped.es_contacto_principal = datos.es_contacto_principal
+  const { error } = await supabase.from('contactos_emergencia').insert({ user_id: internalId, ...mapped })
   if (error) { console.error('Error guardando contacto:', error); throw error }
 }
 
@@ -196,10 +204,15 @@ export async function obtenerContactosEmergencia(userId: string): Promise<any[]>
 }
 
 export async function actualizarContactoEmergencia(id: string, datos: any): Promise<void> {
-  const { error } = await supabase
-    .from('contactos_emergencia')
-    .update(datos)
-    .eq('id', id)
+  const mapped: any = {}
+  if (datos.nombreCompleto !== undefined) mapped.nombre_completo = datos.nombreCompleto
+  if (datos.nombre_completo !== undefined) mapped.nombre_completo = datos.nombre_completo
+  if (datos.parentesco !== undefined) mapped.parentesco = datos.parentesco
+  if (datos.celular !== undefined) mapped.celular = datos.celular
+  if (datos.email !== undefined) mapped.email = datos.email
+  if (datos.autorizadoNotificaciones !== undefined) mapped.autorizado_notificaciones = datos.autorizadoNotificaciones
+  if (datos.esContactoPrincipal !== undefined) mapped.es_contacto_principal = datos.esContactoPrincipal
+  const { error } = await supabase.from('contactos_emergencia').update(mapped).eq('id', id)
   if (error) throw error
 }
 
