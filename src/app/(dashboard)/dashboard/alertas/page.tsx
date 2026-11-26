@@ -48,14 +48,22 @@ export default function AlertasPage() {
   const [ubicacion, setUbicacion] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
-    obtenerAlertasActivas().then(a => { setAlertas(a); setCargando(false) })
+    obtenerAlertasActivas().then(a => { setAlertas(a as AlertaVial[]); setCargando(false) })
     setVotosLocales(cargarVotosLocales())
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(pos =>
         setUbicacion({ lat: pos.coords.latitude, lng: pos.coords.longitude })
       )
     }
-  }, [])
+    // Prellenar ciudad con la del perfil del usuario
+    if (user) {
+      import('@/lib/firestore').then(({ obtenerPerfil }) => {
+        obtenerPerfil(user.uid).then(p => {
+          if (p?.ciudad) setNuevaAlerta(prev => ({ ...prev, ciudad: p.ciudad }))
+        })
+      })
+    }
+  }, [user])
 
   const alertasFiltradas = filtro === 'TODAS' ? alertas : alertas.filter(a => a.tipo === filtro)
   const getTipoInfo = (tipo: TipoAlerta) => TIPOS_ALERTA.find(t => t.valor === tipo) || TIPOS_ALERTA[TIPOS_ALERTA.length - 1]
