@@ -68,33 +68,56 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     })
 
   // ── Maneja la foto seleccionada ──────────────────────────────
-  const handleFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setFotoFile(file)
+    setPasoAmb('enviando')
+
+    // Mostrar preview
     const reader = new FileReader()
     reader.onload = () => setFotoPreview(reader.result as string)
     reader.readAsDataURL(file)
 
+    // Subir foto a Supabase Storage
+    let fotoUrl = ''
+    try {
+      const nombre = `accidente-${Date.now()}.${file.name.split('.').pop() || 'jpg'}`
+      const { data, error } = await supabase.storage
+        .from('fotos-accidentes')
+        .upload(nombre, file, { upsert: true })
+      if (!error && data) {
+        const { data: urlData } = supabase.storage
+          .from('fotos-accidentes')
+          .getPublicUrl(nombre)
+        fotoUrl = urlData.publicUrl
+      }
+    } catch { /* si falla igual se envía sin foto */ }
+
+    // Construir mensaje con el link real de la foto
     const loc = ubicacion
     const motociclista = `${perfil.nombres} ${perfil.apellidos}`
     const placa = perfil.moto?.placa ?? ''
-    let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
+    let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE* 🚑\n`
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`
     msg += `👤 *Accidentado:* ${motociclista}\n`
     if (placa) msg += `🏍️ *Placa:* ${placa}\n`
     if (perfil.infoMedica?.grupoSanguineo) msg += `🩸 *Sangre:* ${perfil.infoMedica.grupoSanguineo}\n`
     if (perfil.infoMedica?.eps) msg += `🏥 *EPS:* ${perfil.infoMedica.eps}\n`
     if (perfil.infoMedica?.alergias) msg += `⚠️ *Alergias:* ${perfil.infoMedica.alergias}\n`
     if (perfil.infoMedica?.condicionesMedicas) msg += `📋 *Condiciones:* ${perfil.infoMedica.condicionesMedicas}\n`
-    if (loc) msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${loc.lat},${loc.lng}\n`
-    else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
-    msg += `📸 *Foto adjunta*\n`
-    msg += `\n_MotoSafe · ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
+    msg += `\n`
+    if (loc) msg += `📍 *_UBICACIÓN GPS_ 👇*\nhttps://www.google.com/maps?q=${loc.lat},${loc.lng}\n`
+    else if (ubicacionManual) msg += `📍 *_LUGAR:_* ${ubicacionManual}\n`
+    if (fotoUrl) msg += `\n📸 *_FOTO DEL ACCIDENTE_ 👇*\n${fotoUrl}\n`
+    msg += `\n━━━━━━━━━━━━━━━━━━━━━━\n`
+    msg += `_MotoSafe · ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
 
-    // window.location.href no es bloqueado por el navegador móvil
-    window.location.href = `https://wa.me/573025341789?text=${encodeURIComponent(msg)}`
     setConfirmacion('✓ Solicitud enviada a la central de ambulancias')
     setPasoAmb('enviado')
+
+    // Redirigir a WhatsApp con el link de la foto incluido
+    window.location.href = `https://wa.me/573025341789?text=${encodeURIComponent(msg)}`
   }
 
   const abrirWhatsAppAmbulancia = () => {
@@ -273,7 +296,6 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
                     Toma una foto del accidente para adjuntarla a la solicitud
                   </p>
 
-                  {/* Preview foto */}
                   {fotoPreview ? (
                     <div className="space-y-3">
                       <div className="relative rounded-xl overflow-hidden">
