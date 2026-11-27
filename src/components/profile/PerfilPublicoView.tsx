@@ -116,8 +116,14 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     setConfirmacion('✓ Solicitud enviada a la central de ambulancias')
     setPasoAmb('enviado')
 
-    // Redirigir a WhatsApp con el link de la foto incluido
-    window.location.href = `https://wa.me/573025341789?text=${encodeURIComponent(msg)}`
+    // Usar protocolo nativo whatsapp:// para abrir directo la app
+    const encoded = encodeURIComponent(msg)
+    const numero = '573025341789'
+    // Intentar abrir con protocolo nativo primero, luego wa.me como fallback
+    window.location.href = `whatsapp://send?phone=${numero}&text=${encoded}`
+    setTimeout(() => {
+      window.location.href = `https://wa.me/${numero}?text=${encoded}`
+    }, 2000)
   }
 
   const abrirWhatsAppAmbulancia = () => {
@@ -296,6 +302,7 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
                     Toma una foto del accidente para adjuntarla a la solicitud
                   </p>
 
+                  {/* Preview foto */}
                   {fotoPreview ? (
                     <div className="space-y-3">
                       <div className="relative rounded-xl overflow-hidden">
