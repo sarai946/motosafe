@@ -122,7 +122,7 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     toast.dismiss('amb')
 
     // 4. Abrir WhatsApp a los dos números
-    window.open(`https://wa.me/573123018786?text=${encoded}`, '_blank')
+    window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank')
     setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
 
     setPasoAmb('enviado')
