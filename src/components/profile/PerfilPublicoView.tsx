@@ -73,13 +73,13 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     if (!file) return
     setFotoFile(file)
     const reader = new FileReader()
-    reader.onload = () => {
-      setFotoPreview(reader.result as string)
-    }
+    reader.onload = () => setFotoPreview(reader.result as string)
     reader.readAsDataURL(file)
+    // No llamamos window.open aquí porque el navegador móvil lo bloquea
+    // El usuario verá un botón grande para confirmar el envío
+  }
 
-    // Abrir WhatsApp INMEDIATAMENTE (antes del upload async)
-    // para evitar que el navegador lo bloquee
+  const abrirWhatsAppAmbulancia = () => {
     const loc = ubicacion
     const motociclista = `${perfil.nombres} ${perfil.apellidos}`
     const placa = perfil.moto?.placa ?? ''
@@ -92,15 +92,11 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     if (perfil.infoMedica?.condicionesMedicas) msg += `📋 *Condiciones:* ${perfil.infoMedica.condicionesMedicas}\n`
     if (loc) msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${loc.lat},${loc.lng}\n`
     else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
-    msg += `📸 *Foto:* (adjuntando...)\n`
+    if (fotoPreview) msg += `📸 *Foto adjunta en la solicitud*\n`
     msg += `\n_MotoSafe · ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
-
-    window.open(`https://wa.me/573025341789?text=${encodeURIComponent(msg)}`, '_blank')
+    window.location.href = `https://wa.me/573025341789?text=${encodeURIComponent(msg)}`
     setConfirmacion('✓ Solicitud enviada a la central de ambulancias')
     setPasoAmb('enviado')
-
-    // Subir foto en segundo plano (no bloquea)
-    enviarSolicitudAmbulanciaConFoto(file)
   }
 
   const enviarSolicitudAmbulanciaConFoto = async (foto: File) => {
@@ -261,11 +257,19 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
 
                   {/* Preview foto */}
                   {fotoPreview ? (
-                    <div className="relative rounded-xl overflow-hidden">
-                      <img src={fotoPreview} alt="Foto accidente" className="w-full h-40 object-cover" />
-                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div className="space-y-3">
+                      <div className="relative rounded-xl overflow-hidden">
+                        <img src={fotoPreview} alt="Foto accidente" className="w-full h-40 object-cover" />
                       </div>
+                      <p className="text-white/60 text-xs text-center">✓ Foto lista — toca el botón para enviar</p>
+                      <button
+                        onClick={abrirWhatsAppAmbulancia}
+                        className="w-full py-4 bg-green-600 hover:bg-green-500 active:scale-95 text-white font-black text-lg rounded-2xl transition-all flex items-center justify-center gap-2"
+                      >
+                        📲 ENVIAR SOLICITUD A LA CENTRAL
+                      </button>
+                      <button onClick={() => { setFotoFile(null); setFotoPreview(null) }}
+                        className="w-full py-2 text-white/40 text-xs">Cambiar foto</button>
                     </div>
                   ) : (
                     <button onClick={() => fileRef.current?.click()}
