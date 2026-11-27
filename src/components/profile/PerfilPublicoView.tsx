@@ -211,6 +211,15 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
         <div className="card border border-red-500/30 bg-red-500/5">
           <p className="text-white font-bold text-sm mb-3 text-center">¿Qué tipo de ayuda necesitas?</p>
 
+          {/* Botón grande SOLICITAR AMBULANCIA */}
+          <button
+            onClick={() => { seleccionarIcono(ICONOS_PRIORITARIOS[0]); setPasoAmb('foto'); setTimeout(() => fileRef.current?.click(), 400) }}
+            className="w-full mb-3 py-4 bg-red-600 hover:bg-red-500 active:scale-95 text-white font-black text-lg rounded-2xl transition-all flex items-center justify-center gap-2"
+            style={{ boxShadow: '0 0 25px rgba(220,38,38,0.4)' }}
+          >
+            🚑 SOLICITAR AMBULANCIA
+          </button>
+
           {/* Iconos */}
           <div className="grid grid-cols-3 gap-2 mb-3">
             {ICONOS_PRIORITARIOS.map(icono => (
