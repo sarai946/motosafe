@@ -73,37 +73,31 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     if (!file) return
     setFotoFile(file)
     const reader = new FileReader()
-    reader.onload = () => setFotoPreview(reader.result as string)
+    reader.onload = () => {
+      setFotoPreview(reader.result as string)
+      // Enviar automáticamente en cuanto la foto esté lista
+      setTimeout(() => enviarSolicitudAmbulanciaConFoto(file), 300)
+    }
     reader.readAsDataURL(file)
   }
 
-  // ── Envío completo de la solicitud de ambulancia ─────────────
-  const enviarSolicitudAmbulancia = async () => {
+  const enviarSolicitudAmbulanciaConFoto = async (foto: File) => {
     setPasoAmb('enviando')
     toast.loading('Enviando solicitud...', { id: 'amb' })
 
-    // 1. Obtener ubicación si no la tiene
     let loc = ubicacion
     if (!loc) loc = await solicitarUbicacion()
 
-    // 2. Subir foto a Supabase Storage
     let fotoUrl = ''
-    if (fotoFile) {
-      try {
-        const nombreArchivo = `accidente-${Date.now()}.${fotoFile.name.split('.').pop()}`
-        const { data, error } = await supabase.storage
-          .from('fotos-accidentes')
-          .upload(nombreArchivo, fotoFile, { upsert: true })
-        if (!error && data) {
-          const { data: urlData } = supabase.storage
-            .from('fotos-accidentes')
-            .getPublicUrl(nombreArchivo)
-          fotoUrl = urlData.publicUrl
-        }
-      } catch { /* si falla la foto igual se envía el mensaje */ }
-    }
+    try {
+      const nombre = `accidente-${Date.now()}.${foto.name.split('.').pop()}`
+      const { data, error } = await supabase.storage.from('fotos-accidentes').upload(nombre, foto, { upsert: true })
+      if (!error && data) {
+        const { data: urlData } = supabase.storage.from('fotos-accidentes').getPublicUrl(nombre)
+        fotoUrl = urlData.publicUrl
+      }
+    } catch { /* si falla la foto igual se envía */ }
 
-    // 3. Construir mensaje WhatsApp
     const motociclista = `${perfil.nombres} ${perfil.apellidos}`
     const placa = perfil.moto?.placa ?? ''
     let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
@@ -120,11 +114,7 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
 
     const encoded = encodeURIComponent(msg)
     toast.dismiss('amb')
-
-    // 4. Abrir WhatsApp a los dos números
     window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank')
-    setTimeout(() => window.open(`https://wa.me/573025341789?text=${encoded}`, '_blank'), 1000)
-
     setPasoAmb('enviado')
     setConfirmacion('✓ Solicitud enviada a la central de ambulancias')
   }
@@ -251,30 +241,21 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
                   {fotoPreview ? (
                     <div className="relative rounded-xl overflow-hidden">
                       <img src={fotoPreview} alt="Foto accidente" className="w-full h-40 object-cover" />
-                      <button onClick={() => { setFotoFile(null); setFotoPreview(null) }}
-                        className="absolute top-2 right-2 p-1 bg-black/60 rounded-full">
-                        <X className="w-4 h-4 text-white" />
-                      </button>
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      </div>
                     </div>
                   ) : (
                     <button onClick={() => fileRef.current?.click()}
                       className="w-full py-4 border-2 border-dashed border-red-500/40 rounded-xl flex flex-col items-center gap-2 text-white/50 hover:border-red-500/70 hover:text-white/70 transition-colors">
                       <Camera className="w-8 h-8" />
                       <span className="text-sm">Tomar / subir foto del accidente</span>
-                      <span className="text-xs text-white/30">Obligatoria para la solicitud</span>
+                      <span className="text-xs text-white/30">Se enviará automáticamente al tomarla</span>
                     </button>
                   )}
 
-                  <div className="flex gap-2">
-                    <button onClick={() => { setIconoSeleccionado(null); setPasoAmb('inicial'); setFotoFile(null); setFotoPreview(null) }}
-                      className="flex-1 py-2.5 btn-secondary text-sm">Cancelar</button>
-                    <button
-                      onClick={enviarSolicitudAmbulancia}
-                      disabled={!fotoFile}
-                      className="flex-1 py-2.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
-                      <Send className="w-4 h-4" /> Enviar solicitud
-                    </button>
-                  </div>
+                  <button onClick={() => { setIconoSeleccionado(null); setPasoAmb('inicial'); setFotoFile(null); setFotoPreview(null) }}
+                    className="w-full py-2 text-white/40 text-xs">Cancelar</button>
                 </>
               ) : pasoAmb === 'enviando' ? (
                 <div className="text-center py-4">
