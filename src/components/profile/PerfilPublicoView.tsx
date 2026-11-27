@@ -75,8 +75,26 @@ export default function PerfilPublicoView({ perfil, userId }: Props) {
     const reader = new FileReader()
     reader.onload = () => setFotoPreview(reader.result as string)
     reader.readAsDataURL(file)
-    // No llamamos window.open aquí porque el navegador móvil lo bloquea
-    // El usuario verá un botón grande para confirmar el envío
+
+    const loc = ubicacion
+    const motociclista = `${perfil.nombres} ${perfil.apellidos}`
+    const placa = perfil.moto?.placa ?? ''
+    let msg = `🚑 *SOLICITUD DE AMBULANCIA - MOTOSAFE*\n\n`
+    msg += `👤 *Accidentado:* ${motociclista}\n`
+    if (placa) msg += `🏍️ *Placa:* ${placa}\n`
+    if (perfil.infoMedica?.grupoSanguineo) msg += `🩸 *Sangre:* ${perfil.infoMedica.grupoSanguineo}\n`
+    if (perfil.infoMedica?.eps) msg += `🏥 *EPS:* ${perfil.infoMedica.eps}\n`
+    if (perfil.infoMedica?.alergias) msg += `⚠️ *Alergias:* ${perfil.infoMedica.alergias}\n`
+    if (perfil.infoMedica?.condicionesMedicas) msg += `📋 *Condiciones:* ${perfil.infoMedica.condicionesMedicas}\n`
+    if (loc) msg += `📍 *Ubicación GPS:* https://www.google.com/maps?q=${loc.lat},${loc.lng}\n`
+    else if (ubicacionManual) msg += `📍 *Lugar:* ${ubicacionManual}\n`
+    msg += `📸 *Foto adjunta*\n`
+    msg += `\n_MotoSafe · ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}_`
+
+    // window.location.href no es bloqueado por el navegador móvil
+    window.location.href = `https://wa.me/573025341789?text=${encodeURIComponent(msg)}`
+    setConfirmacion('✓ Solicitud enviada a la central de ambulancias')
+    setPasoAmb('enviado')
   }
 
   const abrirWhatsAppAmbulancia = () => {
