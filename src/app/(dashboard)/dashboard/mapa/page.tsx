@@ -13,17 +13,74 @@ import toast from 'react-hot-toast'
 
 const MapaLeaflet = dynamic(() => import('@/components/mapa/MapaLeaflet'), { ssr: false })
 
-// ── Categorías y sus tags en OpenStreetMap ───────────────────
+// ── Tags de OpenStreetMap por categoría ─────────────────────
 const TIPOS = [
   { valor: 'TODOS',             label: 'Todos',        emoji: '📍', tags: null },
-  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽', tags: ['amenity=fuel'] },
-  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧', tags: ['shop=motorcycle_repair', 'craft=motorcycle_repair', 'amenity=vehicle_inspection'] },
-  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🔄', tags: ['shop=tyres', 'shop=tire'] },
-  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️', tags: ['shop=motorcycle', 'shop=car_parts'] },
-  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛', tags: ['amenity=breakdown_service', 'service=vehicle_recovery'] },
-  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️', tags: ['amenity=parking', 'amenity=motorcycle_parking'] },
-  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🏥', tags: ['amenity=hospital', 'amenity=clinic', 'amenity=doctors'] },
+  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽', tags: [{ k: 'amenity', v: 'fuel' }] },
+  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧', tags: [{ k: 'shop', v: 'motorcycle_repair' }, { k: 'craft', v: 'motorcycle_repair' }, { k: 'shop', v: 'car_repair' }] },
+  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🔄', tags: [{ k: 'shop', v: 'tyres' }] },
+  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️', tags: [{ k: 'shop', v: 'motorcycle' }, { k: 'shop', v: 'car_parts' }] },
+  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛', tags: [{ k: 'amenity', v: 'breakdown_service' }] },
+  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️', tags: [{ k: 'amenity', v: 'parking' }, { k: 'amenity', v: 'motorcycle_parking' }] },
+  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🏥', tags: [{ k: 'amenity', v: 'hospital' }, { k: 'amenity', v: 'clinic' }] },
 ]
+
+// ── Construir query Overpass correcta ────────────────────────
+function buildOverpassQuery(
+  tags: { k: string; v: string }[],
+  lat: number, lng: number,
+  radio = 5000
+): string {
+  const partes = tags.map(({ k, v }) =>
+    `node["${k}"="${v}"](around:${radio},${lat},${lng});\n` +
+    `way["${k}"="${v}"](around:${radio},${lat},${lng});\n`
+  ).join('')
+  return `[out:json][timeout:25];\n(\n${partes});\nout center;`
+}
+
+// ── Buscar via proxy Next.js (evita CORS) ────────────────────
+async function buscarEnOverpass(
+  lat: number, lng: number,
+  tags: { k: string; v: string }[],
+  radio = 5000
+): Promise<any[]> {
+  const query = buildOverpassQuery(tags, lat, lng, radio)
+
+  const res = await fetch('/api/overpass', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query }),
+  })
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || `Error ${res.status}`)
+  }
+
+  const data = await res.json()
+
+  return (data.elements || [])
+    .map((el: any) => {
+      const t = el.tags || {}
+      const lat = el.lat ?? el.center?.lat
+      const lng = el.lon ?? el.center?.lon
+      if (!lat || !lng) return null
+      return {
+        id: `osm-${el.id}`,
+        nombre: t.name || t['name:es'] || t.brand || 'Sin nombre',
+        tipo: 'OSM',
+        direccion: [t['addr:street'], t['addr:housenumber']].filter(Boolean).join(' ') ||
+                   t['addr:full'] || '',
+        ciudad: t['addr:city'] || 'Colombia',
+        telefono: t.phone || t['contact:phone'] || '',
+        horarios: t.opening_hours || '',
+        lat, lng,
+        verificado: false,
+        esOSM: true,
+      }
+    })
+    .filter(Boolean)
+}
 
 function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371
@@ -37,45 +94,6 @@ function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: numbe
 function tipoInfo(tipo: string) {
   return TIPOS.find(t => t.valor === tipo) || { valor: tipo, label: tipo, emoji: '📍', tags: null }
 }
-
-// ── Consulta a Overpass API ──────────────────────────────────
-async function buscarEnOverpass(
-  lat: number, lng: number,
-  tags: string[],
-  radio = 5000
-): Promise<any[]> {
-  const condiciones = tags.map(tag => {
-    const [k, v] = tag.split('=')
-    return `node["${k}"="${v}"](around:${radio},${lat},${lng});way["${k}"="${v}"](around:${radio},${lat},${lng});`
-  }).join('')
-
-  const query = `[out:json][timeout:25];(${condiciones});out center;`
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
-
-  const res = await fetch(url)
-  const data = await res.json()
-
-  return (data.elements || []).map((el: any) => {
-    const tags = el.tags || {}
-    const lat = el.lat ?? el.center?.lat
-    const lng = el.lon ?? el.center?.lon
-    return {
-      id: `osm-${el.id}`,
-      nombre: tags.name || tags['name:es'] || 'Sin nombre',
-      tipo: 'OSM',
-      direccion: [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ') || tags['addr:full'] || '',
-      ciudad: tags['addr:city'] || 'Bogotá',
-      telefono: tags.phone || tags['contact:phone'] || '',
-      horarios: tags.opening_hours || '',
-      lat,
-      lng,
-      verificado: false,
-      esOSM: true,
-    }
-  }).filter((e: any) => e.lat && e.lng)
-}
-
-// ── Ficha modal ───────────────────────────────────────────────
 function FichaEstablecimiento({ est, ubicacion, onCerrar, userId }: {
   est: any; ubicacion: { lat: number; lng: number } | null
   onCerrar: () => void; userId?: string
@@ -156,14 +174,13 @@ export default function MapaPage() {
     setCargando(true)
     setResultados([])
     try {
-      const tipoObj = TIPOS.find(t => t.valor === tipo)
-      let tags: string[] = []
+      let tags: { k: string; v: string }[] = []
 
       if (tipo === 'TODOS') {
-        // Todos: unir todos los tags de todas las categorías
         tags = TIPOS.filter(t => t.tags).flatMap(t => t.tags!)
-      } else if (tipoObj?.tags) {
-        tags = tipoObj.tags
+      } else {
+        const tipoObj = TIPOS.find(t => t.valor === tipo)
+        tags = tipoObj?.tags || []
       }
 
       if (tags.length === 0) { setCargando(false); return }
@@ -172,10 +189,12 @@ export default function MapaPage() {
       const conDistancia = data
         .map(e => ({ ...e, tipoOriginal: tipo, distancia: calcularDistancia(loc.lat, loc.lng, e.lat, e.lng) }))
         .sort((a, b) => a.distancia - b.distancia)
-        .slice(0, 50) // máximo 50 resultados
+        .slice(0, 50)
       setResultados(conDistancia)
-    } catch {
-      toast.error('Error al buscar. Verifica tu conexión.')
+    } catch (e: any) {
+      toast.error(e.message?.includes('503') || e.message?.includes('servicio')
+        ? 'El servicio de mapas no está disponible. Intenta en unos minutos.'
+        : 'Error al buscar establecimientos. Verifica tu conexión.')
     } finally {
       setCargando(false)
     }
