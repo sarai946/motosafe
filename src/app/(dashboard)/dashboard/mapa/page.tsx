@@ -1,29 +1,28 @@
 'use client'
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import {
   Navigation, Search, Phone, Star, CheckCircle, X,
-  Clock, MessageSquare, AlertTriangle, MapPin, Locate
+  Clock, MessageSquare, AlertTriangle, Locate
 } from 'lucide-react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { useAuth } from '@/context/AuthContext'
-import { obtenerEstablecimientos, calificarEstablecimiento } from '@/lib/firestore'
+import { calificarEstablecimiento } from '@/lib/firestore'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-// Leaflet solo corre en cliente
 const MapaLeaflet = dynamic(() => import('@/components/mapa/MapaLeaflet'), { ssr: false })
 
-// ── Categorías ───────────────────────────────────────────────
+// ── Categorías y sus tags en OpenStreetMap ───────────────────
 const TIPOS = [
-  { valor: 'TODOS',             label: 'Todos',        emoji: '📍' },
-  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽' },
-  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧' },
-  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🔄' },
-  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️' },
-  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛' },
-  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️' },
-  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🏥' },
+  { valor: 'TODOS',             label: 'Todos',        emoji: '📍', tags: null },
+  { valor: 'GASOLINERA',        label: 'Gasolineras',  emoji: '⛽', tags: ['amenity=fuel'] },
+  { valor: 'TALLER',            label: 'Talleres',     emoji: '🔧', tags: ['shop=motorcycle_repair', 'craft=motorcycle_repair', 'amenity=vehicle_inspection'] },
+  { valor: 'MONTALLANTAS',      label: 'Montallantas', emoji: '🔄', tags: ['shop=tyres', 'shop=tire'] },
+  { valor: 'REPUESTOS',         label: 'Repuestos',    emoji: '⚙️', tags: ['shop=motorcycle', 'shop=car_parts'] },
+  { valor: 'GRUA',              label: 'Grúas',        emoji: '🚛', tags: ['amenity=breakdown_service', 'service=vehicle_recovery'] },
+  { valor: 'PARQUEADERO',       label: 'Parqueaderos', emoji: '🅿️', tags: ['amenity=parking', 'amenity=motorcycle_parking'] },
+  { valor: 'CENTRO_ASISTENCIA', label: 'Asistencia',   emoji: '🏥', tags: ['amenity=hospital', 'amenity=clinic', 'amenity=doctors'] },
 ]
 
 function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -36,7 +35,44 @@ function calcularDistancia(lat1: number, lng1: number, lat2: number, lng2: numbe
 }
 
 function tipoInfo(tipo: string) {
-  return TIPOS.find(t => t.valor === tipo) || { valor: tipo, label: tipo, emoji: '📍' }
+  return TIPOS.find(t => t.valor === tipo) || { valor: tipo, label: tipo, emoji: '📍', tags: null }
+}
+
+// ── Consulta a Overpass API ──────────────────────────────────
+async function buscarEnOverpass(
+  lat: number, lng: number,
+  tags: string[],
+  radio = 5000
+): Promise<any[]> {
+  const condiciones = tags.map(tag => {
+    const [k, v] = tag.split('=')
+    return `node["${k}"="${v}"](around:${radio},${lat},${lng});way["${k}"="${v}"](around:${radio},${lat},${lng});`
+  }).join('')
+
+  const query = `[out:json][timeout:25];(${condiciones});out center;`
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
+
+  const res = await fetch(url)
+  const data = await res.json()
+
+  return (data.elements || []).map((el: any) => {
+    const tags = el.tags || {}
+    const lat = el.lat ?? el.center?.lat
+    const lng = el.lon ?? el.center?.lon
+    return {
+      id: `osm-${el.id}`,
+      nombre: tags.name || tags['name:es'] || 'Sin nombre',
+      tipo: 'OSM',
+      direccion: [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ') || tags['addr:full'] || '',
+      ciudad: tags['addr:city'] || 'Bogotá',
+      telefono: tags.phone || tags['contact:phone'] || '',
+      horarios: tags.opening_hours || '',
+      lat,
+      lng,
+      verificado: false,
+      esOSM: true,
+    }
+  }).filter((e: any) => e.lat && e.lng)
 }
 
 // ── Ficha modal ───────────────────────────────────────────────
@@ -44,7 +80,7 @@ function FichaEstablecimiento({ est, ubicacion, onCerrar, userId }: {
   est: any; ubicacion: { lat: number; lng: number } | null
   onCerrar: () => void; userId?: string
 }) {
-  const info = tipoInfo(est.tipo)
+  const info = tipoInfo(est.tipoOriginal || est.tipo)
   const distancia = ubicacion && est.lat && est.lng
     ? calcularDistancia(ubicacion.lat, ubicacion.lng, est.lat, est.lng)
     : null
@@ -54,14 +90,6 @@ function FichaEstablecimiento({ est, ubicacion, onCerrar, userId }: {
       ? `https://www.google.com/maps/dir/${ubicacion.lat},${ubicacion.lng}/${est.lat},${est.lng}`
       : `https://www.google.com/maps/search/?api=1&query=${est.lat},${est.lng}`
     window.open(url, '_blank')
-  }
-
-  const calificar = async (valor: number) => {
-    if (!userId) { toast.error('Inicia sesión para calificar'); return }
-    try {
-      await calificarEstablecimiento(est.id, userId, valor)
-      toast.success('Calificación guardada')
-    } catch { toast.error('Error al calificar') }
   }
 
   return (
@@ -74,7 +102,7 @@ function FichaEstablecimiento({ est, ubicacion, onCerrar, userId }: {
             <div className="w-12 h-12 bg-dark-700 rounded-2xl flex items-center justify-center text-2xl">{info.emoji}</div>
             <div>
               <h2 className="text-white font-bold text-lg leading-tight">{est.nombre}</h2>
-              <p className="text-white/40 text-xs">{info.label} · {est.ciudad}{est.localidad ? ` · ${est.localidad}` : ''}</p>
+              <p className="text-white/40 text-xs">{info.label} · {est.ciudad}</p>
             </div>
           </div>
           <button onClick={onCerrar} className="p-2 text-white/30 hover:text-white rounded-xl hover:bg-white/10">
@@ -83,41 +111,16 @@ function FichaEstablecimiento({ est, ubicacion, onCerrar, userId }: {
         </div>
         <div className="px-5 pb-6 space-y-4">
           <div className="flex flex-wrap gap-2">
-            {est.verificado && <span className="flex items-center gap-1 text-xs bg-accent-500/20 text-accent-300 border border-accent-500/30 px-2 py-1 rounded-lg"><CheckCircle className="w-3 h-3" /> Verificado</span>}
-            {est.es_24_horas && <span className="text-xs bg-green-500/20 text-green-300 border border-green-500/30 px-2 py-1 rounded-lg">🕐 24h</span>}
-            {est.servicio_domicilio && <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-lg">🏠 Domicilio</span>}
             {distancia !== null && <span className="text-xs bg-primary-500/20 text-primary-300 border border-primary-500/30 px-2 py-1 rounded-lg">📍 {distancia.toFixed(1)} km</span>}
+            {est.esOSM && <span className="text-xs bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-1 rounded-lg">🗺️ OpenStreetMap</span>}
           </div>
-          {est.descripcion && <p className="text-white/60 text-sm">{est.descripcion}</p>}
           <div className="grid grid-cols-2 gap-2">
             {est.direccion && <div className="col-span-2 p-3 bg-dark-700 rounded-xl"><p className="text-white/40 text-[10px] uppercase mb-0.5">Dirección</p><p className="text-white text-sm">{est.direccion}</p></div>}
             {est.horarios && <div className="p-3 bg-dark-700 rounded-xl"><p className="text-white/40 text-[10px] uppercase mb-0.5">Horario</p><p className="text-white text-sm">{est.horarios}</p></div>}
-            {est.calificacion && <div className="p-3 bg-dark-700 rounded-xl"><p className="text-white/40 text-[10px] uppercase mb-0.5">Calificación</p><p className="text-yellow-400 text-sm font-semibold flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400" /> {est.calificacion}/5</p></div>}
-            {est.tarifas && <div className="col-span-2 p-3 bg-dark-700 rounded-xl"><p className="text-white/40 text-[10px] uppercase mb-0.5">Tarifas</p><p className="text-white text-sm">{est.tarifas}</p></div>}
           </div>
-          {est.servicios?.length > 0 && (
-            <div>
-              <p className="text-white/40 text-xs uppercase mb-2">Servicios</p>
-              <div className="flex flex-wrap gap-1.5">
-                {est.servicios.map((s: string) => <span key={s} className="text-xs bg-dark-700 text-white/60 px-2 py-1 rounded-lg border border-white/5">{s}</span>)}
-              </div>
-            </div>
-          )}
-          {userId && (
-            <div>
-              <p className="text-white/40 text-xs mb-2">Calificar</p>
-              <div className="flex gap-2">
-                {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => calificar(n)}
-                    className="w-10 h-10 rounded-xl bg-dark-700 hover:bg-yellow-500/20 text-lg transition-colors">⭐</button>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-2 pt-1">
             {est.telefono && <a href={`tel:${est.telefono}`} className="flex items-center justify-center gap-2 py-3 bg-dark-700 hover:bg-dark-600 border border-white/10 rounded-xl text-white text-sm font-medium"><Phone className="w-4 h-4 text-accent-400" /> Llamar</a>}
-            {est.whatsapp && <a href={`https://wa.me/57${est.whatsapp.replace(/\D/g,'')}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 py-3 bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 rounded-xl text-green-300 text-sm font-medium"><MessageSquare className="w-4 h-4" /> WhatsApp</a>}
-            <button onClick={abrirRuta} className={cn('flex items-center justify-center gap-2 py-3 bg-primary-500/20 hover:bg-primary-500/30 border border-primary-500/30 rounded-xl text-primary-300 text-sm font-medium', !est.telefono && !est.whatsapp ? 'col-span-2' : '')}><Navigation className="w-4 h-4" /> Cómo llegar</button>
+            <button onClick={abrirRuta} className={cn('flex items-center justify-center gap-2 py-3 bg-primary-500/20 hover:bg-primary-500/30 border border-primary-500/30 rounded-xl text-primary-300 text-sm font-medium', !est.telefono ? 'col-span-2' : '')}><Navigation className="w-4 h-4" /> Cómo llegar</button>
           </div>
         </div>
       </div>
@@ -131,12 +134,13 @@ export default function MapaPage() {
   const [ubicacion, setUbicacion]       = useState<{ lat: number; lng: number } | null>(null)
   const [gpsEstado, setGpsEstado]       = useState<'solicitando'|'activo'|'denegado'>('solicitando')
   const [ciudadManual, setCiudadManual] = useState('')
-  const [todos, setTodos]               = useState<any[]>([])
-  const [cargando, setCargando]         = useState(true)
+  const [resultados, setResultados]     = useState<any[]>([])
+  const [cargando, setCargando]         = useState(false)
   const [seleccionado, setSeleccionado] = useState<any>(null)
   const [busqueda, setBusqueda]         = useState('')
   const [filtroTipo, setFiltroTipo]     = useState('TODOS')
 
+  // Obtener GPS al entrar
   useEffect(() => {
     if (!navigator.geolocation) { setGpsEstado('denegado'); setUbicacion({ lat: 4.711, lng: -74.0721 }); return }
     navigator.geolocation.getCurrentPosition(
@@ -146,9 +150,48 @@ export default function MapaPage() {
     )
   }, [])
 
-  useEffect(() => {
-    obtenerEstablecimientos().then(d => { setTodos(d); setCargando(false) }).catch(() => setCargando(false))
+  // Buscar en Overpass cuando cambia el filtro o la ubicación
+  const buscar = useCallback(async (tipo: string, loc: { lat: number; lng: number } | null) => {
+    if (!loc) return
+    setCargando(true)
+    setResultados([])
+    try {
+      const tipoObj = TIPOS.find(t => t.valor === tipo)
+      let tags: string[] = []
+
+      if (tipo === 'TODOS') {
+        // Todos: unir todos los tags de todas las categorías
+        tags = TIPOS.filter(t => t.tags).flatMap(t => t.tags!)
+      } else if (tipoObj?.tags) {
+        tags = tipoObj.tags
+      }
+
+      if (tags.length === 0) { setCargando(false); return }
+
+      const data = await buscarEnOverpass(loc.lat, loc.lng, tags)
+      const conDistancia = data
+        .map(e => ({ ...e, tipoOriginal: tipo, distancia: calcularDistancia(loc.lat, loc.lng, e.lat, e.lng) }))
+        .sort((a, b) => a.distancia - b.distancia)
+        .slice(0, 50) // máximo 50 resultados
+      setResultados(conDistancia)
+    } catch {
+      toast.error('Error al buscar. Verifica tu conexión.')
+    } finally {
+      setCargando(false)
+    }
   }, [])
+
+  // Buscar automáticamente cuando hay ubicación
+  useEffect(() => {
+    if (ubicacion) buscar(filtroTipo, ubicacion)
+  }, [ubicacion])
+
+  // Buscar cuando cambia el filtro
+  const cambiarFiltro = (tipo: string) => {
+    setFiltroTipo(tipo)
+    setSeleccionado(null)
+    if (ubicacion) buscar(tipo, ubicacion)
+  }
 
   const usarCiudad = () => {
     const coords: Record<string, {lat:number;lng:number}> = {
@@ -160,15 +203,12 @@ export default function MapaPage() {
     }
     const c = coords[ciudadManual.toLowerCase().trim()]
     if (c) { setUbicacion(c); setGpsEstado('activo') }
-    else toast.error('Ciudad no encontrada. Prueba: Bogotá, Medellín, Cali...')
+    else toast.error('Ciudad no encontrada')
   }
 
-  const filtrados = todos
-    .filter(e => e.lat != null && e.lng != null)
-    .filter(e => filtroTipo === 'TODOS' || e.tipo === filtroTipo)
-    .filter(e => !busqueda || e.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || e.ciudad?.toLowerCase().includes(busqueda.toLowerCase()))
-    .map(e => ({ ...e, distancia: ubicacion ? calcularDistancia(ubicacion.lat, ubicacion.lng, e.lat, e.lng) : null }))
-    .sort((a, b) => (a.distancia ?? 999) - (b.distancia ?? 999))
+  const filtrados = resultados.filter(e =>
+    !busqueda || e.nombre?.toLowerCase().includes(busqueda.toLowerCase()) || e.ciudad?.toLowerCase().includes(busqueda.toLowerCase())
+  )
 
   return (
     <DashboardLayout>
@@ -176,15 +216,14 @@ export default function MapaPage() {
 
         {/* Header */}
         <div className="flex-shrink-0 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-white font-display font-bold text-2xl">Mapa motero</h1>
-              <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1.5">
-                {gpsEstado === 'activo' && <><span className="w-2 h-2 bg-green-400 rounded-full" /> GPS activo · {filtrados.length} lugar{filtrados.length !== 1 ? 'es' : ''}</>}
-                {gpsEstado === 'solicitando' && '📍 Obteniendo ubicación...'}
-                {gpsEstado === 'denegado' && <><AlertTriangle className="w-3 h-3 text-yellow-400" /> GPS no disponible</>}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-white font-display font-bold text-2xl">Mapa motero</h1>
+            <p className="text-white/40 text-xs mt-0.5 flex items-center gap-1.5">
+              {gpsEstado === 'activo' && <><span className="w-2 h-2 bg-green-400 rounded-full" /> GPS activo · {filtrados.length} resultado{filtrados.length !== 1 ? 's' : ''}</>}
+              {gpsEstado === 'solicitando' && '📍 Obteniendo ubicación...'}
+              {gpsEstado === 'denegado' && <><AlertTriangle className="w-3 h-3 text-yellow-400" /> GPS no disponible</>}
+              {cargando && ' · Buscando...'}
+            </p>
           </div>
 
           {gpsEstado === 'denegado' && (
@@ -204,12 +243,13 @@ export default function MapaPage() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
             <input value={busqueda} onChange={e => setBusqueda(e.target.value)}
-              className="input-field pl-10 py-2 text-sm" placeholder="Buscar taller, gasolinera..." />
+              className="input-field pl-10 py-2 text-sm" placeholder="Buscar en los resultados..." />
           </div>
 
+          {/* Categorías */}
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
             {TIPOS.map(t => (
-              <button key={t.valor} onClick={() => setFiltroTipo(t.valor)}
+              <button key={t.valor} onClick={() => cambiarFiltro(t.valor)}
                 className={cn('flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition-colors shrink-0',
                   filtroTipo === t.valor ? 'bg-primary-500 text-white' : 'bg-dark-700 text-white/50 hover:text-white')}>
                 {t.emoji} {t.label}
@@ -218,10 +258,10 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Mapa Leaflet + lista */}
+        {/* Mapa + lista */}
         <div className="flex flex-col md:flex-row flex-1 gap-3 min-h-0">
 
-          {/* Mapa */}
+          {/* Mapa Leaflet */}
           <div className="flex-1 rounded-2xl overflow-hidden border border-white/10 min-h-[300px] md:min-h-0">
             {ubicacion ? (
               <MapaLeaflet
@@ -243,45 +283,44 @@ export default function MapaPage() {
           {/* Lista lateral */}
           <div className="w-full md:w-72 flex-shrink-0 overflow-y-auto space-y-2 max-h-64 md:max-h-none">
             {cargando ? (
-              [1,2,3].map(i => <div key={i} className="skeleton h-16 rounded-2xl" />)
+              <div className="text-center py-8">
+                <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-white/40 text-sm">Buscando en OpenStreetMap...</p>
+              </div>
             ) : filtrados.length === 0 ? (
               <div className="text-center py-8 card border border-white/10">
                 <p className="text-3xl mb-2">🗺️</p>
                 <p className="text-white/40 text-sm">
-                  {todos.filter(e => e.lat && e.lng).length === 0
-                    ? 'Sin establecimientos con ubicación'
-                    : 'Sin resultados'}
+                  {!ubicacion ? 'Activa el GPS para buscar' : 'Sin resultados cercanos'}
                 </p>
                 <p className="text-white/20 text-xs mt-1">
-                  {todos.filter(e => e.lat && e.lng).length === 0
-                    ? 'El admin debe verificar los establecimientos'
-                    : 'Prueba otra categoría'}
+                  {ubicacion ? 'Prueba otra categoría o amplía el radio' : ''}
                 </p>
               </div>
             ) : (
-              filtrados.map(est => (
-                <button key={est.id}
-                  onClick={() => setSeleccionado(seleccionado?.id === est.id ? null : est)}
-                  className={cn('w-full text-left p-3 rounded-2xl border transition-all',
-                    seleccionado?.id === est.id
-                      ? 'border-primary-500/60 bg-primary-500/10'
-                      : 'border-white/10 bg-dark-800 hover:border-white/30')}>
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xl shrink-0">{tipoInfo(est.tipo).emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+              filtrados.map(est => {
+                const info = tipoInfo(est.tipoOriginal || filtroTipo)
+                return (
+                  <button key={est.id}
+                    onClick={() => setSeleccionado(seleccionado?.id === est.id ? null : est)}
+                    className={cn('w-full text-left p-3 rounded-2xl border transition-all',
+                      seleccionado?.id === est.id
+                        ? 'border-primary-500/60 bg-primary-500/10'
+                        : 'border-white/10 bg-dark-800 hover:border-white/30')}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-xl shrink-0">{info.emoji}</span>
+                      <div className="flex-1 min-w-0">
                         <p className="text-white font-semibold text-sm truncate">{est.nombre}</p>
-                        {est.verificado && <CheckCircle className="w-3 h-3 text-accent-400 shrink-0" />}
-                      </div>
-                      <p className="text-white/40 text-xs truncate">{est.ciudad}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {est.distancia !== null && <span className="text-primary-400 text-xs font-semibold">{est.distancia.toFixed(1)} km</span>}
-                        {est.es_24_horas && <span className="text-green-400 text-xs">24h</span>}
+                        {est.direccion && <p className="text-white/40 text-xs truncate">{est.direccion}</p>}
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {est.distancia !== null && <span className="text-primary-400 text-xs font-semibold">{est.distancia.toFixed(1)} km</span>}
+                          {est.horarios && <span className="text-white/30 text-xs truncate">{est.horarios}</span>}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                )
+              })
             )}
           </div>
         </div>
